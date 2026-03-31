@@ -2,16 +2,35 @@ const CaregiverModel = require('../models/caregiver.model');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 
+/**
+ * Verify the caller owns this caregiver profile.
+ *
+ * SECURITY FIX: The old addCertification, removeCertification, and setAvailability
+ * endpoints had no ownership check. Any authenticated user could:
+ *   POST /caregivers/5/certifications  → add fake certs to someone else's profile
+ *   PUT  /caregivers/5/availability    → wipe someone else's availability
+ *   DELETE /caregivers/5/certifications/3 → remove someone else's cert
+ *
+ * Fix: Verify that the :id in the URL matches the caller's caregiver profile.
+ */
+async function requireOwnership(req) {
+  const caregiverId = parseInt(req.params.id, 10);
+  if (isNaN(caregiverId)) throw ApiError.badRequest('Invalid caregiver ID');
+
+  const profile = await CaregiverModel.findByUserId(req.user.id);
+  if (!profile || profile.id !== caregiverId) {
+    throw ApiError.forbidden('You can only modify your own caregiver profile');
+  }
+  return profile;
+}
+
 const search = catchAsync(async (req, res) => {
   const { lat, lon, serviceLevel, dayOfWeek, page, limit } = req.query;
 
-  // Only parse numeric params if they were actually provided.
-  // parseFloat(undefined) = NaN, which would poison our SQL queries.
   const parsedLat = lat !== undefined ? parseFloat(lat) : undefined;
   const parsedLon = lon !== undefined ? parseFloat(lon) : undefined;
   const parsedDay = dayOfWeek !== undefined ? parseInt(dayOfWeek, 10) : undefined;
 
-  // Validate that parsed numbers are actually numbers
   if (parsedLat !== undefined && isNaN(parsedLat)) throw ApiError.badRequest('Invalid latitude');
   if (parsedLon !== undefined && isNaN(parsedLon)) throw ApiError.badRequest('Invalid longitude');
   if (parsedDay !== undefined && (isNaN(parsedDay) || parsedDay < 0 || parsedDay > 6)) {
@@ -27,7 +46,10 @@ const search = catchAsync(async (req, res) => {
 });
 
 const getById = catchAsync(async (req, res) => {
-  const caregiver = await CaregiverModel.findById(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) throw ApiError.badRequest('Invalid caregiver ID');
+
+  const caregiver = await CaregiverModel.findById(id);
   if (!caregiver) throw ApiError.notFound('Caregiver not found');
 
   const certifications = await CaregiverModel.getCertifications(caregiver.id);
@@ -35,25 +57,39 @@ const getById = catchAsync(async (req, res) => {
 });
 
 const addCertification = catchAsync(async (req, res) => {
+  const profile = await requireOwnership(req);
   const cert = await CaregiverModel.addCertification({
-    caregiver_id: req.params.id,
+    caregiver_id: profile.id,
     ...req.body,
   });
   res.status(201).json({ status: 201, data: cert });
 });
 
 const removeCertification = catchAsync(async (req, res) => {
-  await CaregiverModel.removeCertification(req.params.id, req.params.certId);
+  const profile = await requireOwnership(req);
+  const certId = parseInt(req.params.certId, 10);
+  if (isNaN(certId)) throw ApiError.badRequest('Invalid certification ID');
+
+  await CaregiverModel.removeCertification(profile.id, certId);
   res.status(204).send();
 });
 
 const getAvailability = catchAsync(async (req, res) => {
-  const availability = await CaregiverModel.getAvailability(req.params.id);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) throw ApiError.badRequest('Invalid caregiver ID');
+
+  const availability = await CaregiverModel.getAvailability(id);
   res.json({ status: 200, data: availability });
 });
 
 const setAvailability = catchAsync(async (req, res) => {
-  const availability = await CaregiverModel.setAvailability(req.params.id, req.body.slots);
+  const profile = await requireOwnership(req);
+
+  if (!req.body.slots || !Array.isArray(req.body.slots)) {
+    throw ApiError.badRequest('slots must be an array');
+  }
+
+  const availability = await CaregiverModel.setAvailability(profile.id, req.body.slots);
   res.json({ status: 200, data: availability });
 });
 

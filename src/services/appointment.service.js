@@ -108,6 +108,20 @@ const AppointmentService = {
 
   // ── ACCEPT ──────────────────────────────────────────
   // A caregiver claims an unassigned pending appointment.
+  //
+  // RACE CONDITION FIX:
+  // Without protection, two caregivers can call accept() at the same instant.
+  // Both read status='pending' + caregiver_id=NULL, both pass the checks,
+  // both write their caregiver_id — the second one silently overwrites the first.
+  //
+  // Fix: Use an atomic UPDATE with a WHERE clause that checks BOTH conditions.
+  // UPDATE appointments SET caregiver_id=?, status='accepted'
+  //   WHERE id=? AND status='pending' AND caregiver_id IS NULL
+  // If affectedRows === 0, someone else got there first.
+  //
+  // This is called "optimistic locking" — we don't lock the row with SELECT FOR UPDATE,
+  // we just make the UPDATE conditional. If the condition changed between our read and
+  // write, the UPDATE affects 0 rows and we know we lost the race.
   async accept(appointmentId, userId) {
     const appointment = await this.getById(appointmentId);
 
@@ -122,11 +136,19 @@ const AppointmentService = {
     // 3. Caller must be a caregiver
     const caregiverProfile = await this._requireCaregiverProfile(userId);
 
-    // 4. Perform the transition
-    const updated = await AppointmentModel.update(appointmentId, {
-      caregiver_id: caregiverProfile.id,
-      status: 'accepted',
-    });
+    // 4. Atomic conditional update — prevents race condition
+    const db = require('../config/database');
+    const affectedRows = await db('appointments')
+      .where({ id: appointmentId, status: 'pending', caregiver_id: null })
+      .update({ caregiver_id: caregiverProfile.id, status: 'accepted' });
+
+    if (affectedRows === 0) {
+      throw ApiError.conflict(
+        'This appointment was just accepted by another caregiver. Please try a different appointment.'
+      );
+    }
+
+    const updated = await AppointmentModel.findById(appointmentId);
 
     // 5. Resolve care_receiver_profiles.id → users.id for the notification
     const receiverUserId = await this._resolveReceiverUserId(appointment.care_receiver_id);

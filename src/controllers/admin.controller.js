@@ -35,13 +35,19 @@ const getAppointmentStats = catchAsync(async (req, res) => {
   const { period = '30d' } = req.query;
   const days = parseInt(period, 10) || 30;
 
+  // SECURITY FIX: The old code interpolated `days` directly into a db.raw() string:
+  //   db.raw(`DATE_SUB(NOW(), INTERVAL ${days} DAY)`)
+  // Even though parseInt makes `days` a number, this pattern is dangerous because:
+  // 1. If someone later changes the parsing, the injection opens up.
+  // 2. It teaches bad habits — always use parameterized queries.
+  // Fix: Use ? placeholder so Knex sends it as a bound parameter.
   const stats = await db('appointments')
     .select(
       db.raw('DATE(created_at) as date'),
       db.raw('COUNT(*) as count'),
       db.raw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
     )
-    .where('created_at', '>=', db.raw(`DATE_SUB(NOW(), INTERVAL ${days} DAY)`))
+    .where('created_at', '>=', db.raw('DATE_SUB(NOW(), INTERVAL ? DAY)', [days]))
     .groupByRaw('DATE(created_at)')
     .orderBy('date');
 

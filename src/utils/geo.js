@@ -24,15 +24,26 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Returns a Knex raw expression for Haversine distance in MySQL.
- * Use in .select() to add a computed distance_km column.
+ * Returns a Knex-compatible raw SQL fragment + bindings for Haversine distance.
+ *
+ * SECURITY FIX: The old version interpolated `lat` and `lon` directly into the
+ * SQL string. Even though the controller validates them as numbers, string
+ * interpolation in SQL is ALWAYS a red flag. If a future caller forgot to
+ * validate, this would be a direct SQL injection vector.
+ *
+ * Fix: Return { sql, bindings } so the caller can use db.raw(sql, bindings).
+ * Column names (latColumn, lonColumn) are still interpolated because they're
+ * developer-controlled identifiers, not user input.
  */
-function haversineSQL(latColumn, lonColumn, lat, lon) {
-  return `(${EARTH_RADIUS_KM} * ACOS(
-    LEAST(1, COS(RADIANS(${lat})) * COS(RADIANS(${latColumn})) *
-    COS(RADIANS(${lonColumn}) - RADIANS(${lon})) +
-    SIN(RADIANS(${lat})) * SIN(RADIANS(${latColumn})))
+function haversineSQL(latColumn, lonColumn) {
+  const sql = `(${EARTH_RADIUS_KM} * ACOS(
+    LEAST(1, COS(RADIANS(?)) * COS(RADIANS(${latColumn})) *
+    COS(RADIANS(${lonColumn}) - RADIANS(?)) +
+    SIN(RADIANS(?)) * SIN(RADIANS(${latColumn})))
   ))`;
+
+  // Returns template — caller provides [lat, lon, lat] as bindings
+  return sql;
 }
 
 module.exports = { haversineDistance, haversineSQL, EARTH_RADIUS_KM };

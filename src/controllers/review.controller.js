@@ -107,7 +107,16 @@ const update = catchAsync(async (req, res) => {
     throw ApiError.badRequest('Reviews can only be edited within 48 hours of creation');
   }
 
-  const updated = await ReviewModel.update(id, req.body);
+  // SECURITY FIX: Mass-assignment. The old code did ReviewModel.update(id, req.body).
+  // An attacker could send { "reviewee_id": 1, "reviewer_id": 999, "appointment_id": 1 }
+  // to reassign the review to a different appointment or change who it's about.
+  // Fix: Only allow the fields that are legitimately editable.
+  const pick = require('../utils/pick');
+  const allowedUpdates = pick(req.body, [
+    'overall_rating', 'punctuality', 'professionalism', 'skill_level', 'comment',
+  ]);
+
+  const updated = await ReviewModel.update(id, allowedUpdates);
   res.json({ status: 200, data: updated });
 });
 
