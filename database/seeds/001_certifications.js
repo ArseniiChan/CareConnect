@@ -1,15 +1,26 @@
+const { v4: uuidv4 } = require('uuid');
+
 /**
- * @param { import("knex").Knex } knex
- * @returns { Promise<void> }
+ * Seed certifications for Joshua's `certification` table.
+ *
+ * Table: certification
+ * Columns: certification_id binary(16), certification_name, issuing_authority, description
  */
 exports.seed = async function (knex) {
-  await knex('certifications').del();
+  await knex('certification').del();
 
-  await knex('certifications').insert([
-    { name: 'Certified Nursing Assistant', abbreviation: 'CNA', level: 'CNA', description: 'Provides basic patient care under the supervision of nursing staff.' },
-    { name: 'Registered Nursing Assistant', abbreviation: 'RNA', level: 'RNA', description: 'Provides advanced nursing assistance with medication administration capabilities.' },
-    { name: 'Nurse Practitioner', abbreviation: 'NP', level: 'NP', description: 'Advanced practice registered nurse with prescriptive authority.' },
-    { name: 'Home Health Aide', abbreviation: 'HHA', level: 'CNA', description: 'Provides personal care services in the home setting.' },
-    { name: 'CPR/First Aid Certification', abbreviation: 'CPR', level: 'other', description: 'Basic life support and first aid certification.' },
-  ]);
+  const certs = [
+    { certification_name: 'Certified Nursing Assistant', issuing_authority: 'State Board of Nursing', description: 'Provides basic patient care under the supervision of nursing staff.' },
+    { certification_name: 'Registered Nursing Assistant', issuing_authority: 'State Board of Nursing', description: 'Provides advanced nursing assistance with medication administration capabilities.' },
+    { certification_name: 'Nurse Practitioner', issuing_authority: 'ANCC / AANP', description: 'Advanced practice registered nurse with prescriptive authority.' },
+    { certification_name: 'Home Health Aide', issuing_authority: 'State Department of Health', description: 'Provides personal care services in the home setting.' },
+    { certification_name: 'CPR/First Aid Certification', issuing_authority: 'American Red Cross', description: 'Basic life support and first aid certification.' },
+  ];
+
+  const rows = certs.map((cert) => ({
+    certification_id: knex.raw('uuid_to_bin(?)', [uuidv4()]),
+    ...cert,
+  }));
+
+  await knex('certification').insert(rows);
 };

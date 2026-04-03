@@ -1,134 +1,116 @@
 const db = require('../config/database');
+const { toBin, fromBin, whereUuid } = require('../utils/uuid');
+
+/**
+ * Caregiver model — maps to Joshua's `caregiver` table.
+ *
+ * KEY CHANGE from old schema:
+ * - Old: caregiver_profiles table with user_id FK → users table
+ * - New: caregiver table IS the profile. caregiver_id = user_id (same UUID)
+ *
+ * Table: caregiver
+ * Columns: caregiver_id binary(16) PK, first_name, last_name, email, phone,
+ *          is_verified, rating, created_at, profile_picture_url
+ */
+
+const TABLE = 'caregiver';
 
 const CaregiverModel = {
-  async findByUserId(userId) {
-    return db('caregiver_profiles').where({ user_id: userId }).first();
-  },
-
+  /**
+   * Find caregiver by their ID (which is also the user_id).
+   * In the old schema, findByUserId was needed because profile.id ≠ user.id.
+   * Now caregiver_id === user_id, so findById handles both cases.
+   */
   async findById(id) {
-    return db('caregiver_profiles as cp')
-      .join('users as u', 'cp.user_id', 'u.id')
-      .where('cp.id', id)
+    return db(TABLE)
       .select(
-        'cp.*',
-        'u.first_name', 'u.last_name', 'u.email', 'u.phone', 'u.avatar_url'
+        db.raw(fromBin('caregiver_id')),
+        'first_name', 'last_name', 'email', 'phone',
+        'is_verified', 'rating', 'created_at', 'profile_picture_url'
       )
+      .whereRaw(whereUuid('caregiver_id'), [id])
       .first();
   },
 
-  async create(profileData) {
-    const [id] = await db('caregiver_profiles').insert(profileData);
-    return this.findById(id);
+  async create(data) {
+    await db(TABLE).insert(data);
+    // data.caregiver_id is a raw expression, so we need the uuid string to re-fetch
+    // Caller should pass the uuid string separately or we find by email
+    if (data.email) {
+      return db(TABLE)
+        .select(db.raw(fromBin('caregiver_id')), 'first_name', 'last_name', 'email', 'phone',
+          'is_verified', 'rating', 'created_at', 'profile_picture_url')
+        .where({ email: data.email })
+        .first();
+    }
+    return null;
   },
 
   async update(id, data) {
-    await db('caregiver_profiles').where({ id }).update(data);
+    await db(TABLE).whereRaw(whereUuid('caregiver_id'), [id]).update(data);
     return this.findById(id);
   },
 
+  /**
+   * Get certifications for a caregiver.
+   * Joins caregiverCertification → certification for cert details.
+   */
   async getCertifications(caregiverId) {
-    return db('caregiver_certifications as cc')
-      .join('certifications as c', 'cc.certification_id', 'c.id')
-      .where('cc.caregiver_id', caregiverId)
-      .select('cc.*', 'c.name', 'c.abbreviation', 'c.level');
+    return db('caregiverCertification as cc')
+      .join('certification as c', function () {
+        this.on(db.raw('cc.certification_id = c.certification_id'));
+      })
+      .whereRaw(whereUuid('cc.caregiver_id'), [caregiverId])
+      .select(
+        db.raw(fromBin('cc.caregiver_certification_id', 'caregiver_certification_id')),
+        db.raw(fromBin('cc.certification_id', 'certification_id')),
+        'cc.certificate_number',
+        'cc.issued_date', 'cc.expiration_date',
+        'cc.verification_status', 'cc.document_url', 'cc.created_at',
+        'c.certification_name', 'c.issuing_authority', 'c.description'
+      );
   },
 
   async addCertification(data) {
-    const [id] = await db('caregiver_certifications').insert(data);
-    return db('caregiver_certifications').where({ id }).first();
+    await db('caregiverCertification').insert(data);
+    // Re-fetch by certification_id
+    return db('caregiverCertification')
+      .select(
+        db.raw(fromBin('caregiver_certification_id')),
+        db.raw(fromBin('caregiver_id')),
+        db.raw(fromBin('certification_id')),
+        'certificate_number', 'issued_date', 'expiration_date',
+        'verification_status', 'document_url', 'created_at'
+      )
+      .whereRaw('caregiver_certification_id = ?', [data.caregiver_certification_id])
+      .first();
   },
 
   async removeCertification(caregiverId, certId) {
-    return db('caregiver_certifications')
-      .where({ caregiver_id: caregiverId, id: certId })
+    return db('caregiverCertification')
+      .whereRaw(whereUuid('caregiver_id'), [caregiverId])
+      .andWhereRaw(whereUuid('caregiver_certification_id'), [certId])
       .del();
   },
 
-  async getAvailability(caregiverId) {
-    return db('caregiver_availability')
-      .where({ caregiver_id: caregiverId })
-      .orderBy('day_of_week')
-      .orderBy('start_time');
-  },
-
-  async setAvailability(caregiverId, slots) {
-    await db.transaction(async (trx) => {
-      await trx('caregiver_availability').where({ caregiver_id: caregiverId }).del();
-      if (slots.length > 0) {
-        const rows = slots.map((s) => ({ caregiver_id: caregiverId, ...s }));
-        await trx('caregiver_availability').insert(rows);
-      }
-    });
-    return this.getAvailability(caregiverId);
-  },
-
-  async search({ lat, lon, serviceLevel, dayOfWeek, page = 1, limit = 20 } = {}) {
-    const query = db('caregiver_profiles as cp')
-      .join('users as u', 'cp.user_id', 'u.id')
-      .where('cp.is_verified', true)
-      .where('u.is_active', true);
-
-    if (serviceLevel) {
-      query.whereExists(function () {
-        this.select('*')
-          .from('caregiver_certifications as cc')
-          .join('certifications as c', 'cc.certification_id', 'c.id')
-          .whereRaw('cc.caregiver_id = cp.id')
-          .where('c.level', serviceLevel);
-      });
-    }
-
-    if (dayOfWeek !== undefined && !isNaN(dayOfWeek)) {
-      query.whereExists(function () {
-        this.select('*')
-          .from('caregiver_availability as ca')
-          .whereRaw('ca.caregiver_id = cp.id')
-          .where('ca.day_of_week', dayOfWeek);
-      });
-    }
+  /**
+   * Search for verified caregivers.
+   * Simplified from old schema — no separate profiles table, no availability table.
+   */
+  async search({ lat, lon, page = 1, limit = 20 } = {}) {
+    const query = db(TABLE).where('is_verified', true);
 
     const selectFields = [
-      'cp.id', 'cp.user_id', 'cp.bio', 'cp.hourly_rate', 'cp.years_experience',
-      'cp.average_rating', 'cp.total_reviews', 'cp.service_radius_km',
-      'u.first_name', 'u.last_name', 'u.avatar_url',
+      db.raw(fromBin('caregiver_id')),
+      'first_name', 'last_name', 'email', 'phone',
+      'rating', 'profile_picture_url',
     ];
 
-    // If coordinates provided, add distance calculation
-    if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
-      const haversine = `(6371 * ACOS(LEAST(1,
-        COS(RADIANS(?)) * COS(RADIANS(a.latitude)) *
-        COS(RADIANS(a.longitude) - RADIANS(?)) +
-        SIN(RADIANS(?)) * SIN(RADIANS(a.latitude))
-      )))`;
-
-      query
-        .join('addresses as a', function () {
-          this.on('a.user_id', 'u.id').andOn('a.is_default', db.raw('TRUE'));
-        })
-        .select(...selectFields, db.raw(`${haversine} AS distance_km`, [lat, lon, lat]))
-        .havingRaw('distance_km <= cp.service_radius_km')
-        .orderBy('distance_km', 'asc');
-    } else {
-      query.select(...selectFields).orderBy('cp.average_rating', 'desc');
-    }
+    query.select(selectFields).orderBy('rating', 'desc');
 
     const offset = (page - 1) * limit;
     const data = await query.limit(limit).offset(offset);
     return data;
-  },
-
-  async updateRating(caregiverId) {
-    const result = await db('reviews as r')
-      .join('appointments as a', 'r.appointment_id', 'a.id')
-      .where('a.caregiver_id', caregiverId)
-      .avg('r.overall_rating as avg_rating')
-      .count('* as total')
-      .first();
-
-    await db('caregiver_profiles').where({ id: caregiverId }).update({
-      average_rating: result.avg_rating || 0,
-      total_reviews: result.total || 0,
-    });
   },
 };
 

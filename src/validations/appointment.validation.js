@@ -1,41 +1,37 @@
 const Joi = require('joi');
 
+/**
+ * Appointment validations — adapted for Joshua's schema.
+ *
+ * Changes:
+ * - IDs are now UUID strings, not integers
+ * - scheduledStart/scheduledEnd → startTime/endTime
+ * - No serviceTypeId (no service_types table)
+ * - No tasks (no appointment_tasks table)
+ * - Status values: 'requested','scheduled','completed','cancelled'
+ * - sortBy default: start_time (not scheduled_start)
+ */
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const createAppointment = {
   body: Joi.object({
-    serviceTypeId: Joi.number().integer().required(),
-    addressId: Joi.number().integer().required(),
-    scheduledStart: Joi.date().iso().greater('now').required(),
-    scheduledEnd: Joi.date().iso().greater(Joi.ref('scheduledStart')).required(),
+    addressId: Joi.string().pattern(UUID_PATTERN).required()
+      .messages({ 'string.pattern.base': 'addressId must be a valid UUID' }),
+    startTime: Joi.date().iso().greater('now').required(),
+    endTime: Joi.date().iso().greater(Joi.ref('startTime')).required(),
     notes: Joi.string().max(2000).allow('', null),
-    tasks: Joi.array().items(
-      Joi.object({
-        description: Joi.string().max(500).required(),
-        sortOrder: Joi.number().integer().default(0),
-      })
-    ),
   }),
-};
-
-const updateAppointment = {
-  params: Joi.object({
-    id: Joi.number().integer().required(),
-  }),
-  body: Joi.object({
-    scheduledStart: Joi.date().iso(),
-    scheduledEnd: Joi.date().iso(),
-    notes: Joi.string().max(2000).allow('', null),
-    cancellationReason: Joi.string().max(500),
-  }).min(1),
 };
 
 const listAppointments = {
   query: Joi.object({
-    status: Joi.string().valid('pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'no_show'),
+    status: Joi.string().valid('requested', 'scheduled', 'completed', 'cancelled'),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
-    sortBy: Joi.string().valid('scheduled_start', 'created_at').default('scheduled_start'),
+    sortBy: Joi.string().valid('start_time', 'created_at').default('start_time'),
     order: Joi.string().valid('asc', 'desc').default('desc'),
   }),
 };
 
-module.exports = { createAppointment, updateAppointment, listAppointments };
+module.exports = { createAppointment, listAppointments };

@@ -1,29 +1,29 @@
 const AddressModel = require('../models/address.model');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
+const { generate: generateUuid } = require('../utils/uuid');
+const db = require('../config/database');
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Transforms camelCase request body keys to snake_case DB column names.
+ * Transforms camelCase request body keys to Joshua's column names.
  *
- * WHY THIS EXISTS:
- * Our API accepts camelCase (JSON convention) but our MySQL columns use
- * snake_case (SQL convention). Joi validates the camelCase shape, then
- * this function maps to DB columns before Knex tries to insert/update.
- *
- * Alternative approaches:
- * 1. Use Knex's postProcessResponse/wrapIdentifier for automatic conversion
- *    (global, affects every query — risky in a team project)
- * 2. Accept snake_case in the API (ugly for frontend devs)
- * 3. Use an ORM like Sequelize that handles this (heavy dependency)
- *
- * We chose explicit mapping: simple, no magic, easy to debug.
+ * Joshua's schema uses slightly different column names than our old schema:
+ *   streetAddress → address_line1
+ *   aptUnit → address_line2
+ *   label → nickname
+ *   isDefault → is_primary
  */
 function toDbFields(body) {
   const map = {
-    streetAddress: 'street_address',
-    aptUnit: 'apt_unit',
+    nickname: 'nickname',
+    addressLine1: 'address_line1',
+    addressLine2: 'address_line2',
+    isPrimary: 'is_primary',
+    // These are already matching:
+    // city, state, zip_code (zipCode), latitude, longitude
     zipCode: 'zip_code',
-    isDefault: 'is_default',
   };
 
   const result = {};
@@ -35,23 +35,32 @@ function toDbFields(body) {
 }
 
 const list = catchAsync(async (req, res) => {
+  // In the new schema, addresses belong to care_receiver_id = user_id
   const addresses = await AddressModel.listForUser(req.user.id);
   res.json({ status: 200, data: addresses });
 });
 
 const create = catchAsync(async (req, res) => {
   const dbData = toDbFields(req.body);
-  const address = await AddressModel.create({ user_id: req.user.id, ...dbData });
+  const addressId = generateUuid();
+
+  await db('address').insert({
+    address_id: db.raw('uuid_to_bin(?)', [addressId]),
+    care_receiver_id: db.raw('uuid_to_bin(?)', [req.user.id]),
+    ...dbData,
+  });
+
+  const address = await AddressModel.findById(addressId);
   res.status(201).json({ status: 201, data: address });
 });
 
 const update = catchAsync(async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) throw ApiError.badRequest('Invalid address ID');
+  const id = req.params.id;
+  if (!id || !UUID_REGEX.test(id)) throw ApiError.badRequest('Invalid address ID');
 
   const address = await AddressModel.findById(id);
   if (!address) throw ApiError.notFound('Address not found');
-  if (address.user_id !== req.user.id) throw ApiError.forbidden();
+  if (address.care_receiver_id !== req.user.id) throw ApiError.forbidden();
 
   const dbData = toDbFields(req.body);
   const updated = await AddressModel.update(id, dbData);
@@ -59,12 +68,12 @@ const update = catchAsync(async (req, res) => {
 });
 
 const remove = catchAsync(async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) throw ApiError.badRequest('Invalid address ID');
+  const id = req.params.id;
+  if (!id || !UUID_REGEX.test(id)) throw ApiError.badRequest('Invalid address ID');
 
   const address = await AddressModel.findById(id);
   if (!address) throw ApiError.notFound('Address not found');
-  if (address.user_id !== req.user.id) throw ApiError.forbidden();
+  if (address.care_receiver_id !== req.user.id) throw ApiError.forbidden();
 
   await AddressModel.delete(id);
   res.status(204).send();

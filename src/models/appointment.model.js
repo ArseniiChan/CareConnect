@@ -1,48 +1,85 @@
 const db = require('../config/database');
+const { toBin, fromBin, whereUuid } = require('../utils/uuid');
+
+/**
+ * Appointment model — maps to Joshua's `appointment` table.
+ *
+ * KEY CHANGES from old schema:
+ * - Table name: appointments → appointment
+ * - IDs: auto-increment int → binary(16) UUID
+ * - Status values: 'requested','scheduled','completed','cancelled'
+ *   (was: 'pending','accepted','in_progress','completed','cancelled','no_show')
+ * - Column renames:
+ *   - scheduled_start → start_time
+ *   - scheduled_end → end_time
+ *   - cancellation_reason → cancelled_reason
+ *   - No more: actual_start, actual_end, service_type_id
+ * - New: requested_at, cancelled_at
+ * - No appointment_tasks table
+ * - No service_types table (service_type_id removed)
+ *
+ * Table: appointment
+ * Columns: appointment_id binary(16) PK, caregiver_id binary(16) nullable,
+ *          care_receiver_id binary(16), address_id binary(16),
+ *          requested_at, start_time, end_time,
+ *          status enum('requested','scheduled','completed','cancelled'),
+ *          notes, cancelled_reason, cancelled_at, created_at
+ */
+
+const TABLE = 'appointment';
 
 const AppointmentModel = {
   async findById(id) {
-    return db('appointments as a')
-      .leftJoin('service_types as st', 'a.service_type_id', 'st.id')
-      .leftJoin('addresses as addr', 'a.address_id', 'addr.id')
-      .where('a.id', id)
+    return db(TABLE + ' as a')
+      .leftJoin('address as addr', function () {
+        this.on(db.raw('a.address_id = addr.address_id'));
+      })
+      .whereRaw(whereUuid('a.appointment_id'), [id])
       .select(
-        'a.*',
-        'st.name as service_name', 'st.base_hourly_rate',
-        'addr.street_address', 'addr.city', 'addr.state', 'addr.zip_code',
-        'addr.latitude', 'addr.longitude'
+        db.raw(fromBin('a.appointment_id', 'appointment_id')),
+        db.raw(fromBin('a.caregiver_id', 'caregiver_id')),
+        db.raw(fromBin('a.care_receiver_id', 'care_receiver_id')),
+        db.raw(fromBin('a.address_id', 'address_id')),
+        'a.requested_at', 'a.start_time', 'a.end_time',
+        'a.status', 'a.notes', 'a.cancelled_reason', 'a.cancelled_at', 'a.created_at',
+        'addr.address_line1', 'addr.address_line2', 'addr.city', 'addr.state',
+        'addr.zip_code', 'addr.latitude', 'addr.longitude'
       )
       .first();
   },
 
   async create(data) {
-    const [id] = await db('appointments').insert(data);
-    return this.findById(id);
+    await db(TABLE).insert(data);
+    // Caller provides the appointment_id UUID string for re-fetch
+    return null; // Service layer will re-fetch
   },
 
   async update(id, data) {
-    await db('appointments').where({ id }).update(data);
+    await db(TABLE).whereRaw(whereUuid('appointment_id'), [id]).update(data);
     return this.findById(id);
   },
 
-  async listForUser(userId, role, { status, page = 1, limit = 20, sortBy = 'scheduled_start', order = 'desc' } = {}) {
-    const query = db('appointments as a')
-      .leftJoin('service_types as st', 'a.service_type_id', 'st.id')
-      .leftJoin('caregiver_profiles as cp', 'a.caregiver_id', 'cp.id')
-      .leftJoin('users as cgu', 'cp.user_id', 'cgu.id')
-      .leftJoin('care_receiver_profiles as crp', 'a.care_receiver_id', 'crp.id')
-      .leftJoin('users as cru', 'crp.user_id', 'cru.id');
+  /**
+   * List appointments for a user, filtered by role.
+   *
+   * SIMPLIFIED from old schema:
+   * - No profile-table indirection (user_id = caregiver_id or care_receiver_id)
+   * - No service_types join
+   * - Joins caregiver/careReceiver tables for names
+   */
+  async listForUser(userId, role, { status, page = 1, limit = 20, sortBy = 'start_time', order = 'desc' } = {}) {
+    const query = db(TABLE + ' as a')
+      .leftJoin('caregiver as cg', function () {
+        this.on(db.raw('a.caregiver_id = cg.caregiver_id'));
+      })
+      .leftJoin('careReceiver as cr', function () {
+        this.on(db.raw('a.care_receiver_id = cr.care_receiver_id'));
+      });
 
     if (role === 'caregiver') {
-      const profile = await db('caregiver_profiles').where({ user_id: userId }).first();
-      if (profile) {
-        query.where('a.caregiver_id', profile.id);
-      }
+      query.whereRaw(whereUuid('a.caregiver_id'), [userId]);
     } else if (role === 'care_receiver') {
-      const profile = await db('care_receiver_profiles').where({ user_id: userId }).first();
-      if (profile) {
-        query.where('a.care_receiver_id', profile.id);
-      }
+      query.whereRaw(whereUuid('a.care_receiver_id'), [userId]);
     }
     // Admin sees all — no filter
 
@@ -51,46 +88,29 @@ const AppointmentModel = {
     }
 
     const offset = (page - 1) * limit;
+    const selectFields = [
+      db.raw(fromBin('a.appointment_id', 'appointment_id')),
+      db.raw(fromBin('a.caregiver_id', 'caregiver_id')),
+      db.raw(fromBin('a.care_receiver_id', 'care_receiver_id')),
+      db.raw(fromBin('a.address_id', 'address_id')),
+      'a.requested_at', 'a.start_time', 'a.end_time',
+      'a.status', 'a.notes', 'a.created_at',
+      'cg.first_name as caregiver_first_name', 'cg.last_name as caregiver_last_name',
+      'cr.first_name as receiver_first_name', 'cr.last_name as receiver_last_name',
+    ];
+
+    const allowedSortCols = ['start_time', 'created_at'];
+    const safeSort = allowedSortCols.includes(sortBy) ? `a.${sortBy}` : 'a.start_time';
+
     const [data, [{ total }]] = await Promise.all([
       query.clone()
-        .select(
-          'a.*',
-          'st.name as service_name',
-          'cgu.first_name as caregiver_first_name', 'cgu.last_name as caregiver_last_name',
-          'cru.first_name as receiver_first_name', 'cru.last_name as receiver_last_name'
-        )
-        .orderBy(`a.${sortBy}`, order)
+        .select(selectFields)
+        .orderBy(safeSort, order)
         .limit(limit).offset(offset),
       query.clone().count('* as total'),
     ]);
 
     return { data, total };
-  },
-
-  async getTasks(appointmentId) {
-    return db('appointment_tasks')
-      .where({ appointment_id: appointmentId })
-      .orderBy('sort_order');
-  },
-
-  async addTask(data) {
-    const [id] = await db('appointment_tasks').insert(data);
-    return db('appointment_tasks').where({ id }).first();
-  },
-
-  async updateTask(taskId, data) {
-    await db('appointment_tasks').where({ id: taskId }).update(data);
-    return db('appointment_tasks').where({ id: taskId }).first();
-  },
-
-  async findPendingByServiceLevel(serviceLevel) {
-    return db('appointments as a')
-      .join('service_types as st', 'a.service_type_id', 'st.id')
-      .where('a.status', 'pending')
-      .where('st.required_certification_level', serviceLevel)
-      .whereNull('a.caregiver_id')
-      .select('a.*', 'st.name as service_name')
-      .orderBy('a.created_at', 'asc');
   },
 };
 

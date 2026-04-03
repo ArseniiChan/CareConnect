@@ -1,7 +1,12 @@
 const UserModel = require('../models/user.model');
+const CaregiverModel = require('../models/caregiver.model');
+const CareReceiverModel = require('../models/careReceiver.model');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 const { buildPaginationResponse } = require('../utils/pagination');
+const pick = require('../utils/pick');
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const list = catchAsync(async (req, res) => {
   const { page, limit, role } = req.query;
@@ -9,19 +14,27 @@ const list = catchAsync(async (req, res) => {
   res.json({ status: 200, ...buildPaginationResponse(data, total, page, limit) });
 });
 
-// GET /users/profile — returns the authenticated user's own profile
+// GET /users/profile — returns the authenticated user's own profile with role data
 const getProfile = catchAsync(async (req, res) => {
   const user = await UserModel.findById(req.user.id);
   if (!user) throw ApiError.notFound('User not found');
 
   const { password_hash, ...safeUser } = user;
-  res.json({ status: 200, data: safeUser });
+
+  // Merge in role-specific profile data
+  let profile = null;
+  if (user.role === 'caregiver') {
+    profile = await CaregiverModel.findById(user.user_id);
+  } else if (user.role === 'care_receiver') {
+    profile = await CareReceiverModel.findById(user.user_id);
+  }
+
+  res.json({ status: 200, data: { ...safeUser, profile } });
 });
 
 const getById = catchAsync(async (req, res) => {
-  // Guard: if :id isn't a valid integer, reject early instead of querying with NaN
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) throw ApiError.badRequest('Invalid user ID');
+  const id = req.params.id;
+  if (!id || !UUID_REGEX.test(id)) throw ApiError.badRequest('Invalid user ID');
 
   const user = await UserModel.findById(id);
   if (!user) throw ApiError.notFound('User not found');
@@ -31,25 +44,16 @@ const getById = catchAsync(async (req, res) => {
 });
 
 const update = catchAsync(async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) throw ApiError.badRequest('Invalid user ID');
+  const id = req.params.id;
+  if (!id || !UUID_REGEX.test(id)) throw ApiError.badRequest('Invalid user ID');
 
   // Users can only update their own profile (unless admin)
   if (req.user.role !== 'admin' && req.user.id !== id) {
     throw ApiError.forbidden();
   }
 
-  // SECURITY FIX: Mass-assignment vulnerability.
-  // The old code passed req.body directly to the model:
-  //   UserModel.update(id, req.body)
-  //
-  // An attacker could send: { "role": "admin", "is_active": true, "password_hash": "..." }
-  // and promote themselves to admin, reactivate a banned account, or overwrite
-  // someone's password hash with a known value.
-  //
-  // Fix: Whitelist only the fields a user is allowed to change.
-  const pick = require('../utils/pick');
-  const allowedFields = ['first_name', 'last_name', 'phone', 'avatar_url'];
+  // Whitelist only allowed fields — prevents mass-assignment
+  const allowedFields = ['email'];
   const updates = pick(req.body, allowedFields);
 
   if (Object.keys(updates).length === 0) {
@@ -62,11 +66,14 @@ const update = catchAsync(async (req, res) => {
 });
 
 const deactivate = catchAsync(async (req, res) => {
-  if (req.user.role !== 'admin' && req.user.id !== parseInt(req.params.id, 10)) {
+  const id = req.params.id;
+  if (!id || !UUID_REGEX.test(id)) throw ApiError.badRequest('Invalid user ID');
+
+  if (req.user.role !== 'admin' && req.user.id !== id) {
     throw ApiError.forbidden();
   }
 
-  await UserModel.deactivate(req.params.id);
+  await UserModel.deactivate(id);
   res.status(204).send();
 });
 

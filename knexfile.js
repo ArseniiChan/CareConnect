@@ -9,6 +9,7 @@ module.exports = {
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'careconnect',
+      ssl: process.env.DB_PORT === '4000' ? { rejectUnauthorized: true } : undefined,
     },
     pool: {
       min: parseInt(process.env.DB_POOL_MIN, 10) || 2,
