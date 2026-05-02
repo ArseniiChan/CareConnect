@@ -31,7 +31,8 @@ function formatTimeForInput(date) {
 
 function buildInitialFormState() {
   const now = new Date();
-  const end = new Date(now.getTime() + (2 * 60 * 60 * 1000));
+  const start = new Date(now.getTime() + 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
 
   return {
     nickname: 'Home',
@@ -39,8 +40,8 @@ function buildInitialFormState() {
     city: '',
     state: 'NY',
     zipCode: '',
-    startDate: formatDateForInput(now),
-    startTime: formatTimeForInput(now),
+    startDate: formatDateForInput(start),
+    startTime: formatTimeForInput(start),
     endTime: formatTimeForInput(end),
     notes: '',
   };
@@ -86,8 +87,13 @@ export default function BookPage() {
         });
         addressId = created.data.address_id;
       }
-      const startIso = new Date(`${form.startDate}T${form.startTime}:00`).toISOString();
-      const endIso = new Date(`${form.startDate}T${form.endTime}:00`).toISOString();
+      const start = new Date(`${form.startDate}T${form.startTime}:00`);
+      let end = new Date(`${form.startDate}T${form.endTime}:00`);
+      if (end.getTime() <= start.getTime()) {
+        end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+      }
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
 
       const res = await appointments.create({
         addressId,
