@@ -31,7 +31,13 @@ const listAppointments = {
     limit: Joi.number().integer().min(1).max(100).default(20),
     sortBy: Joi.string().valid('start_time', 'created_at').default('start_time'),
     order: Joi.string().valid('asc', 'desc').default('desc'),
-  }),
+    // Geographic filter — only meaningful for caregiver discovery.
+    // lat/lng must come together; radiusMiles is optional (when omitted we
+    // still compute distance for display but don't filter).
+    lat: Joi.number().min(-90).max(90),
+    lng: Joi.number().min(-180).max(180),
+    radiusMiles: Joi.number().positive().max(500),
+  }).and('lat', 'lng'),
 };
 
 module.exports = { createAppointment, listAppointments };
