@@ -3,6 +3,8 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 const { generate: generateUuid } = require('../utils/uuid');
 const db = require('../config/database');
+const { geocode, buildAddressQuery } = require('../services/geocoding.service');
+const { whereUuid } = require('../utils/uuid');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,9 +52,32 @@ const create = catchAsync(async (req, res) => {
     ...dbData,
   });
 
+  // Geocode in the background — don't block the create response. If the user
+  // creates an address and immediately books, the appointment will save fine
+  // without coordinates; the radius filter will just skip that row until the
+  // backfill lands. Fire-and-forget by design.
+  geocodeAddressInBackground(addressId, dbData);
+
   const address = await AddressModel.findById(addressId);
   res.status(201).json({ status: 201, data: address });
 });
+
+function geocodeAddressInBackground(addressId, fields) {
+  const query = buildAddressQuery(fields);
+  if (!query) return;
+  geocode(query)
+    .then(async (coords) => {
+      if (!coords) return;
+      try {
+        await db('address')
+          .whereRaw(whereUuid('address_id'), [addressId])
+          .update({ latitude: coords.lat, longitude: coords.lng });
+      } catch (err) {
+        console.warn(`geocode update failed for ${addressId}: ${err.message}`);
+      }
+    })
+    .catch((err) => console.warn(`geocode failed for ${addressId}: ${err.message}`));
+}
 
 const update = catchAsync(async (req, res) => {
   const id = req.params.id;
