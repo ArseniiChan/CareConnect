@@ -93,3 +93,10 @@ export const messages = {
       body: JSON.stringify({ content }),
     }),
 };
+
+// ── Admin ─────────────────────────────────────────────────────
+export const admin = {
+  dashboard: () => api('/api/v1/admin/dashboard'),
+  appointmentStats: (period = '30d') =>
+    api(`/api/v1/admin/appointments/stats?period=${encodeURIComponent(period)}`),
+};
