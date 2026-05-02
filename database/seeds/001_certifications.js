@@ -7,6 +7,11 @@ const { v4: uuidv4 } = require('uuid');
  * Columns: certification_id binary(16), certification_name, issuing_authority, description
  */
 exports.seed = async function (knex) {
+  // Delete child rows first (FK constraint: caregiverCertification.certification_id → certification)
+  // Otherwise the certification delete fails with a foreign-key error.
+  // We also clear caregiverCertification fully here so 003_demo_users.js starts from a clean slate
+  // and can reinsert links idempotently.
+  await knex('caregiverCertification').del();
   await knex('certification').del();
 
   const certs = [
