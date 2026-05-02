@@ -135,8 +135,28 @@ export default function RegisterPage() {
 
               {role === 'care_receiver' && (
                 <>
-                  <Field id="birthday" label="Date of birth" optional type="date" value={form.birthday} onChange={(v) => update('birthday', v)} />
-                  <Field id="sex" label="Sex" optional value={form.sex} onChange={(v) => update('sex', v)} />
+                  <Field
+                    id="birthday"
+                    label="Date of birth"
+                    optional
+                    type="date"
+                    value={form.birthday}
+                    onChange={(v) => update('birthday', v)}
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                  <SelectField
+                    id="sex"
+                    label="Sex"
+                    optional
+                    value={form.sex}
+                    onChange={(v) => update('sex', v)}
+                    options={[
+                      { value: '', label: 'Prefer not to say' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'male', label: 'Male' },
+                      { value: 'other', label: 'Other' },
+                    ]}
+                  />
                 </>
               )}
 
@@ -188,7 +208,7 @@ function RoleCard({ icon: Icon, title, description, onClick }) {
   );
 }
 
-function Field({ id, label, value, onChange, type = 'text', required, optional, autoComplete, hint }) {
+function Field({ id, label, value, onChange, type = 'text', required, optional, autoComplete, hint, max }) {
   return (
     <div className="mb-4">
       <label htmlFor={id} className="field-label">
@@ -202,9 +222,33 @@ function Field({ id, label, value, onChange, type = 'text', required, optional, 
         onChange={(e) => onChange(e.target.value)}
         required={required}
         autoComplete={autoComplete}
+        max={max}
         className="input"
       />
       {hint && <p className="field-hint">{hint}</p>}
+    </div>
+  );
+}
+
+// Constrains free-text fields to a known set of values — better data hygiene
+// and one less moment of "what should I type here?" for older users.
+function SelectField({ id, label, value, onChange, optional, options }) {
+  return (
+    <div className="mb-4">
+      <label htmlFor={id} className="field-label">
+        {label}
+        {optional && <span className="ml-1.5 text-sm font-normal text-[var(--color-neutral-500)]">(optional)</span>}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
