@@ -12,6 +12,7 @@ import AppointmentsPage from './pages/AppointmentsPage';
 import AppointmentDetailPage from './pages/AppointmentDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import ProfilePage from './pages/ProfilePage';
+import AdminRevenuePage from './pages/AdminRevenuePage';
 
 import './App.css';
 
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/admin/revenue" element={<ProtectedRoute role="admin"><AdminRevenuePage /></ProtectedRoute>} />
           </Route>
 
           {/* Catch-all */}

@@ -20,5 +20,6 @@ router.use('/appointments', require('./appointment.routes'));
 router.use('/addresses', require('./address.routes'));
 router.use('/messages', require('./message.routes'));
 router.use('/admin', require('./admin.routes'));
+router.use('/geocode', require('./geocode.routes'));
 
 module.exports = router;

@@ -60,9 +60,20 @@ export const appointments = {
   // Care receiver: their own bookings.
   // Caregiver (no status filter): their assignments.
   // Caregiver (?status=requested): the open-request discovery feed.
-  list: (status) => {
-    const q = status ? `?status=${encodeURIComponent(status)}` : '';
-    return api(`/api/v1/appointments${q}`);
+  // Optional `geo` { lat, lng, radiusMiles } adds the distance filter +
+  // distance column for the caregiver discovery feed.
+  list: (status, geo) => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (geo && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+      params.set('lat', String(geo.lat));
+      params.set('lng', String(geo.lng));
+      if (typeof geo.radiusMiles === 'number') {
+        params.set('radiusMiles', String(geo.radiusMiles));
+      }
+    }
+    const qs = params.toString();
+    return api(`/api/v1/appointments${qs ? `?${qs}` : ''}`);
   },
   get: (id) => api(`/api/v1/appointments/${id}`),
   create: (body) =>
@@ -92,4 +103,40 @@ export const messages = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+};
+
+// ── Geocoding ────────────────────────────────────────────────
+// Returns { lat, lng } or null when nothing matched. Used by the caregiver
+// service-area capture and any future address autocomplete.
+export const geocode = {
+  lookup: (q) => api(`/api/v1/geocode?q=${encodeURIComponent(q)}`),
+};
+
+// ── Admin ─────────────────────────────────────────────────────
+export const admin = {
+  dashboard: () => api('/api/v1/admin/dashboard'),
+  appointmentStats: (period = '30d') =>
+    api(`/api/v1/admin/appointments/stats?period=${encodeURIComponent(period)}`),
+  revenue: (periodDays = 30) =>
+    api(`/api/v1/admin/revenue?period=${periodDays}`),
+  // CSV export needs the auth header set, so we use the same fetch wrapper
+  // and trigger a browser download from the resulting blob. The backend
+  // sends `Content-Disposition: attachment` so the file lands in Downloads.
+  exportRevenueCsv: async (periodDays = 30) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(
+      `${BASE}/api/v1/admin/revenue/export.csv?period=${periodDays}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `careconnect-revenue-${periodDays}d.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
