@@ -19,7 +19,7 @@ export default function App() {
   return (
     <BrowserRouter>
         <Routes>
-          // Public routes  
+          {/* Public routes */}
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/appointments" element={<AppointmentsPage />} />
@@ -27,7 +27,7 @@ export default function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/caregivers" element={<CareGiversPage />} />
           </Route>
-          // Auth routes
+          {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
         </Routes>
     </BrowserRouter>
