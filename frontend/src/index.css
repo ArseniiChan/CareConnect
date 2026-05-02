@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap');
-
+@import "tailwindcss";
 *,
 *::before,
 *::after {
@@ -17,4 +17,66 @@ body {
 
 #root {
   min-height: 100svh;
+}
+
+@import "tailwindcss";
+
+@theme {
+  --color-background: #ffffff;
+  --color-background-dark: #0b0f0d;
+
+  --color-surface: #ffffff;
+  --color-surface-soft: #f8fafc;
+  --color-surface-dark: #111827;
+  --color-surface-darkSoft: #1f2937;
+
+  --color-text: #111827;
+  --color-text-dark: #f9fafb;
+
+  --color-muted: #6b7280;
+  --color-muted-dark: #9ca3af;
+
+  --color-subtle: #9ca3af;
+  --color-subtle-dark: #6b7280;
+
+  --color-border: #e5e7eb;
+  --color-border-dark: #27352f;
+
+  --radius-app: 0.875rem;
+  --radius-card: 1.25rem;
+
+  --shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-softDark: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-button: 0 4px 12px rgba(34, 197, 94, 0.22);
+}
+
+@layer components {
+  .app-page {
+    @apply min-h-screen bg-background text-text dark:bg-background-dark dark:text-text-dark;
+  }
+
+  .app-card {
+    @apply bg-white border border-border rounded-card shadow-soft p-5
+           dark:bg-surface-dark dark:border-border-dark dark:shadow-softDark;
+  }
+
+  .app-muted {
+    @apply text-muted dark:text-muted-dark;
+  }
+
+  .btn-primary {
+    @apply bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-3 rounded-app shadow-button transition;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-surface-soft text-text border border-border font-medium px-5 py-3 rounded-app transition
+           dark:bg-surface-dark dark:hover:bg-surface-darkSoft dark:text-text-dark dark:border-border-dark;
+  }
+
+  .input {
+    @apply bg-white border border-border text-text placeholder:text-subtle px-4 py-3 rounded-app outline-none 
+           focus:ring-2 focus:ring-green-200 focus:border-green-500
+           dark:bg-surface-dark dark:border-border-dark dark:text-text-dark dark:placeholder:text-subtle-dark
+           dark:focus:ring-green-900 dark:focus:border-green-500;
+  }
 }
