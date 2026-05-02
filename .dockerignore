@@ -1,0 +1,46 @@
+# .dockerignore — files NOT to copy into the Docker build context.
+# Reduces image size, speeds up builds, prevents secrets from leaking into images.
+
+# Dependencies (rebuilt inside the container)
+node_modules
+frontend/node_modules
+
+# Local environment files (NEVER ship secrets in an image)
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+
+# Git
+.git
+.gitignore
+
+# Frontend (the backend image does not need frontend source)
+frontend
+
+# Tests, docs, plan — none of this needs to be in the runtime image
+tests
+docs
+PROJECT_PLAN.md
+
+# Build artifacts
+dist
+build
+coverage
+
+# Uploads (mounted as a volume in production, not baked in)
+uploads/*
+!uploads/.gitkeep
