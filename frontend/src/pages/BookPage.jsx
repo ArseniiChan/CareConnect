@@ -16,22 +16,42 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Calendar as CalIcon, NotebookPen, CheckCircle2 } from 'lucide-react';
 import { addresses, appointments } from '../api/client';
 
-export default function BookPage() {
-  const navigate = useNavigate();
+function formatDateForInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-  const [savedAddresses, setSavedAddresses] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({
+function formatTimeForInput(date) {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function buildInitialFormState() {
+  const now = new Date();
+  const end = new Date(now.getTime() + (2 * 60 * 60 * 1000));
+
+  return {
     nickname: 'Home',
     addressLine1: '',
     city: '',
     state: 'NY',
     zipCode: '',
-    startDate: '',
-    startTime: '09:00',
-    endTime: '11:00',
+    startDate: formatDateForInput(now),
+    startTime: formatTimeForInput(now),
+    endTime: formatTimeForInput(end),
     notes: '',
-  });
+  };
+}
+
+export default function BookPage() {
+  const navigate = useNavigate();
+
+  const [savedAddresses, setSavedAddresses] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [form, setForm] = useState(buildInitialFormState);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
