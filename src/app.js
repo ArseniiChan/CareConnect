@@ -14,6 +14,15 @@ const { sanitizeObject } = require('./utils/sanitize');
 
 const app = express();
 
+// ── Proxy Trust ─────────────────────────────────────
+// Railway (and most PaaS) sit behind a reverse proxy that adds X-Forwarded-For.
+// Without this, express-rate-limit refuses to use that header (validation
+// error ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and req.ip is the proxy's IP, not
+// the real client. Trust ONE hop — the platform's edge proxy.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // ── Security ────────────────────────────────────────
 app.use(helmet());                // Security headers
 app.use(hpp());                   // Prevent HTTP parameter pollution
