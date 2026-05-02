@@ -66,6 +66,15 @@ const AppointmentModel = {
    * - No profile-table indirection (user_id = caregiver_id or care_receiver_id)
    * - No service_types join
    * - Joins caregiver/careReceiver tables for names
+   *
+   * CAREGIVER DISCOVERY SEMANTIC (important):
+   * A caregiver cannot logically own an appointment in `requested` state — by
+   * the FSM, `requested` means `caregiver_id IS NULL`. So when a caregiver
+   * queries `?status=requested`, they want to discover OPEN requests, not see
+   * their own (which would always be empty). We treat this combination as the
+   * canonical "open requests" query: status='requested' AND caregiver_id IS NULL.
+   *
+   * For any other status filter, caregivers see only appointments assigned to them.
    */
   async listForUser(userId, role, { status, page = 1, limit = 20, sortBy = 'start_time', order = 'desc' } = {}) {
     const query = db(TABLE + ' as a')
@@ -77,14 +86,20 @@ const AppointmentModel = {
       });
 
     if (role === 'caregiver') {
-      query.whereRaw(whereUuid('a.caregiver_id'), [userId]);
+      if (status === 'requested') {
+        // Caregiver discovery: open, unassigned requests
+        query.whereNull('a.caregiver_id').where('a.status', 'requested');
+      } else {
+        // Caregiver's own assignments
+        query.whereRaw(whereUuid('a.caregiver_id'), [userId]);
+        if (status) query.where('a.status', status);
+      }
     } else if (role === 'care_receiver') {
       query.whereRaw(whereUuid('a.care_receiver_id'), [userId]);
-    }
-    // Admin sees all — no filter
-
-    if (status) {
-      query.where('a.status', status);
+      if (status) query.where('a.status', status);
+    } else {
+      // Admin sees all
+      if (status) query.where('a.status', status);
     }
 
     const offset = (page - 1) * limit;

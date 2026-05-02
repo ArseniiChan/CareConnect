@@ -19,8 +19,26 @@ app.use(helmet());                // Security headers
 app.use(hpp());                   // Prevent HTTP parameter pollution
 
 // ── CORS ────────────────────────────────────────────
+// Supports multiple origins via comma-separated CORS_ORIGIN env var.
+// Vercel issues a different URL for preview deploys vs production, plus
+// developers run the frontend at localhost:5173 — so a single origin won't
+// work. Parse a list and check incoming requests against it.
+//
+// Examples:
+//   CORS_ORIGIN=http://localhost:5173
+//   CORS_ORIGIN=https://careconnect.vercel.app,https://careconnect-git-main-arsenii.vercel.app,http://localhost:5173
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    // Allow non-browser callers (curl, server-to-server) which send no Origin
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS: origin ${origin} not allowed. Set CORS_ORIGIN env var.`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
