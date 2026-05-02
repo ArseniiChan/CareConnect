@@ -32,8 +32,10 @@ Thumbs.db
 frontend
 
 # Tests, docs, plan — none of this needs to be in the runtime image
+# EXCEPT docs/swagger.yaml which the API serves at /api/docs
 tests
-docs
+docs/*
+!docs/swagger.yaml
 PROJECT_PLAN.md
 
 # Build artifacts
