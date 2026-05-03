@@ -5,6 +5,28 @@ const CareReceiverModel = require('../models/careReceiver.model');
 const ApiError = require('../utils/ApiError');
 const { generate: generateUuid, toBin, whereUuid } = require('../utils/uuid');
 
+// Flat hourly rate for demo. In a production billing system this would come
+// from a service catalog or a per-caregiver rate column.
+const HOURLY_RATE_CENTS = 5000; // $50/hour
+
+/**
+ * Invoke a MySQL stored procedure with one OUT parameter and return its value.
+ *
+ * Why we go this manual path: Knex's .raw() doesn't handle CALL ... ; SELECT @x
+ * neatly because TiDB returns one ResultSet per statement. We use a single
+ * mysql2 call against the underlying connection to keep things deterministic.
+ */
+async function callProcedure(procName, inParams) {
+  const placeholders = inParams.map(() => '?').concat('@out_result').join(', ');
+  const sql = `CALL ${procName}(${placeholders})`;
+  await db.raw(sql, inParams);
+  const [rows] = await db.raw('SELECT @out_result AS result');
+  // mysql2 wraps the rows in [rows, fields]; knex unwraps to [rows] depending
+  // on the driver mode. Handle both shapes defensively.
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  return row?.result ?? null;
+}
+
 // ──────────────────────────────────────────────────────────
 // APPOINTMENT STATE MACHINE — ADAPTED FOR JOSHUA'S SCHEMA
 // ──────────────────────────────────────────────────────────
@@ -89,42 +111,28 @@ const AppointmentService = {
   // ── ACCEPT (requested → scheduled) ─────────────────
   // A caregiver claims an unassigned requested appointment.
   //
-  // RACE CONDITION FIX (preserved from original):
-  // Atomic UPDATE with WHERE clause checks both conditions.
-  // If affectedRows === 0, someone else got there first.
+  // The race-safe UPDATE lives inside the stored procedure
+  // sp_accept_appointment (database/db_enhancements.sql). The DB does the
+  // atomic claim and reports the outcome via the OUT parameter, so two
+  // caregivers tapping at the same instant cannot both win — exactly one
+  // gets 'accepted', the other gets 'unavailable' and we surface a 409.
+  //
+  // We still do JS-side validation (caller is a caregiver, friendly errors)
+  // to short-circuit obvious failures without a DB roundtrip and to keep
+  // error messages consistent.
   async accept(appointmentId, userId) {
-    const appointment = await this.getById(appointmentId);
-
-    // 1. State transition check
-    this._validateTransition(appointment.status, 'scheduled');
-
-    // 2. Must not already be assigned
-    if (appointment.caregiver_id) {
-      throw ApiError.conflict('This appointment has already been assigned to a caregiver');
-    }
-
-    // 3. Caller must be a caregiver
     const caregiver = await CaregiverModel.findById(userId);
     if (!caregiver) {
       throw ApiError.forbidden('Only caregivers can accept appointments');
     }
 
-    // 4. Atomic conditional update — prevents race condition
-    const affectedRows = await db('appointment')
-      .whereRaw(whereUuid('appointment_id'), [appointmentId])
-      .where({ status: 'requested' })
-      .whereNull('caregiver_id')
-      .update({
-        caregiver_id: db.raw('uuid_to_bin(?)', [userId]),
-        status: 'scheduled',
-      });
+    const result = await callProcedure('sp_accept_appointment', [userId, appointmentId]);
 
-    if (affectedRows === 0) {
+    if (result === 'unavailable') {
       throw ApiError.conflict(
-        'This appointment was just accepted by another caregiver. Please try a different appointment.'
+        'This appointment was just accepted by another caregiver, or is no longer open.'
       );
     }
-
     return AppointmentModel.findById(appointmentId);
   },
 
@@ -147,44 +155,52 @@ const AppointmentService = {
   },
 
   // ── COMPLETE (scheduled → completed) ────────────────
-  // The assigned caregiver finishes the appointment.
+  // Delegated to sp_complete_appointment, which:
+  //   1. Validates the caller is the assigned caregiver
+  //   2. Calculates pay from start/end time and the hourly rate
+  //   3. Updates the appointment row AND inserts a payment row in one TXN
+  // Two-statement atomic procedure — exactly the kind of work a stored
+  // procedure exists to do.
   async complete(appointmentId, userId) {
-    const appointment = await this.getById(appointmentId);
+    const result = await callProcedure(
+      'sp_complete_appointment',
+      [userId, appointmentId, HOURLY_RATE_CENTS]
+    );
 
-    // 1. State transition check
-    this._validateTransition(appointment.status, 'completed');
-
-    // 2. Only the ASSIGNED caregiver can complete
-    this._requireAssignedCaregiver(appointment, userId);
-
-    // 3. Update status
-    return AppointmentModel.update(appointmentId, {
-      status: 'completed',
-    });
+    if (result === 'not_found') throw ApiError.notFound('Appointment not found');
+    if (result === 'wrong_state') {
+      throw ApiError.badRequest('This appointment cannot be completed from its current state.');
+    }
+    if (result === 'forbidden') {
+      throw ApiError.forbidden('Only the assigned caregiver can complete this appointment.');
+    }
+    return AppointmentModel.findById(appointmentId);
   },
 
   // ── CANCEL ──────────────────────────────────────────
-  // Either the care receiver or assigned caregiver can cancel.
+  // Delegated to sp_cancel_appointment, which performs the role check
+  // (care receiver or assigned caregiver) inside the database itself —
+  // defense-in-depth on top of our middleware authorization.
   async cancel(appointmentId, userId, reason) {
-    const appointment = await this.getById(appointmentId);
-
-    // 1. State transition check
-    this._validateTransition(appointment.status, 'cancelled');
-
-    // 2. Verify the caller is a participant
-    this._requireParticipant(appointment, userId);
-
-    // 3. Require a cancellation reason
     if (!reason || reason.trim().length === 0) {
       throw ApiError.badRequest('A cancellation reason is required');
     }
 
-    // 4. Perform the cancellation
-    return AppointmentModel.update(appointmentId, {
-      status: 'cancelled',
-      cancelled_reason: reason.trim(),
-      cancelled_at: new Date(),
-    });
+    const result = await callProcedure(
+      'sp_cancel_appointment',
+      [userId, appointmentId, reason.trim()]
+    );
+
+    if (result === 'not_found') throw ApiError.notFound('Appointment not found');
+    if (result === 'terminal') {
+      throw ApiError.badRequest('This appointment is already completed or cancelled.');
+    }
+    if (result === 'forbidden') {
+      throw ApiError.forbidden(
+        'Only the care receiver or the assigned caregiver can cancel this appointment.'
+      );
+    }
+    return AppointmentModel.findById(appointmentId);
   },
 
   // ──────────────────────────────────────────────────────

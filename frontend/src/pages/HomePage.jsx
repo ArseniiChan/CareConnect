@@ -13,11 +13,13 @@
 //   - Counterparty name larger than meta — hierarchy via size + weight + color
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarPlus, Search, MapPin, Clock } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CalendarPlus, Search, MapPin, Clock, List, Map as MapIcon } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { appointments } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import ServiceAreaCard, { loadServiceArea } from '../components/ServiceAreaCard';
+import AppointmentsMap from '../components/AppointmentsMap';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -103,21 +105,38 @@ function CareReceiverHome() {
 // ════════════════════════════════════════════════════════════
 function CaregiverHome() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [serviceArea, setServiceArea] = useState(loadServiceArea);
   const [open, setOpen] = useState(null);
   const [scheduled, setScheduled] = useState(null);
   const [error, setError] = useState('');
+  // Persist the user's preferred view (list vs map) for the session. Map
+  // is only available when a service area is set — without one we have
+  // nothing to center on.
+  const [viewMode, setViewMode] = useState('list');
+
+  // Refetch open requests whenever the service area changes (or clears).
+  // Scheduled jobs are unaffected by location, so they fetch once on mount.
+  useEffect(() => {
+    setOpen(null);
+    appointments.list('requested', serviceArea ? {
+      lat: serviceArea.lat,
+      lng: serviceArea.lng,
+      radiusMiles: serviceArea.radiusMiles,
+    } : undefined)
+      .then((a) => setOpen(a.data || []))
+      .catch((err) => setError(err.message));
+  }, [serviceArea]);
 
   useEffect(() => {
-    Promise.all([
-      appointments.list('requested'),
-      appointments.list('scheduled'),
-    ])
-      .then(([a, b]) => {
-        setOpen(a.data || []);
-        setScheduled(b.data || []);
-      })
+    appointments.list('scheduled')
+      .then((b) => setScheduled(b.data || []))
       .catch((err) => setError(err.message));
   }, []);
+
+  const filterDescription = serviceArea
+    ? `Within ${serviceArea.radiusMiles} miles of ${serviceArea.zip}.`
+    : 'Care receivers waiting for someone to accept.';
 
   return (
     <div>
@@ -125,25 +144,40 @@ function CaregiverHome() {
 
       {error && <p className="alert alert-error mb-6">{error}</p>}
 
+      <ServiceAreaCard area={serviceArea} onChange={setServiceArea} />
+
       <Section
         title="Open requests"
-        subtitle="Care receivers waiting for someone to accept."
+        subtitle={filterDescription}
         count={open?.length}
         icon={Search}
+        action={serviceArea && open && open.length > 0 ? (
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+        ) : null}
       >
         {open === null && <Skeleton rows={2} />}
         {open && open.length === 0 && (
           <EmptyCard
-            title="No open requests right now"
-            body="When a care receiver books, their request will appear here."
+            title={serviceArea ? 'Nothing open in your area right now' : 'No open requests right now'}
+            body={serviceArea
+              ? 'Try widening your radius, or check back in a bit.'
+              : 'When a care receiver books, their request will appear here.'}
           />
         )}
-        {open && open.length > 0 && (
+        {open && open.length > 0 && viewMode === 'list' && (
           <ul className="space-y-3">
             {open.map((a) => (
               <AppointmentCard key={a.appointment_id} appt={a} viewerRole="caregiver" mode="discover" />
             ))}
           </ul>
+        )}
+        {open && open.length > 0 && viewMode === 'map' && serviceArea && (
+          <AppointmentsMap
+            center={[serviceArea.lat, serviceArea.lng]}
+            radiusMiles={serviceArea.radiusMiles}
+            appointments={open}
+            onSelect={(a) => navigate(`/appointments/${a.appointment_id}`)}
+          />
         )}
       </Section>
 
@@ -184,7 +218,7 @@ function Greeting({ name, subtitle }) {
   );
 }
 
-function Section({ title, subtitle, count, icon: Icon, children }) {
+function Section({ title, subtitle, count, icon: Icon, action, children }) {
   return (
     <section className="mb-10">
       <div className="mb-4 flex items-end justify-between gap-4">
@@ -202,9 +236,43 @@ function Section({ title, subtitle, count, icon: Icon, children }) {
             <p className="mt-1 text-base text-[var(--color-neutral-500)]">{subtitle}</p>
           )}
         </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {children}
     </section>
+  );
+}
+
+// Two-button group toggle. Used to flip between list and map view of open
+// requests on the caregiver dashboard.
+function ViewToggle({ value, onChange }) {
+  const opts = [
+    { id: 'list', label: 'List', icon: List },
+    { id: 'map',  label: 'Map',  icon: MapIcon },
+  ];
+  return (
+    <div role="tablist" aria-label="Open requests view" className="inline-flex rounded-lg border border-[var(--color-border)] bg-white p-1">
+      {opts.map((o) => {
+        const active = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(o.id)}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition ${
+              active
+                ? 'bg-[var(--color-primary-50)] text-[var(--color-primary-800)]'
+                : 'text-[var(--color-neutral-700)] hover:bg-[var(--color-neutral-50)]'
+            }`}
+          >
+            <o.icon size={16} strokeWidth={2.2} aria-hidden="true" />
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -215,6 +283,11 @@ function AppointmentCard({ appt, viewerRole, mode }) {
       ? `${appt.caregiver_first_name} ${appt.caregiver_last_name}`
       : 'Awaiting caregiver';
 
+  // distance_miles is only set when the caller passed lat/lng. Show it
+  // prominently on caregiver discovery cards — it's the most relevant fact
+  // when deciding which open request to take.
+  const distance = typeof appt.distance_miles === 'number' ? appt.distance_miles : null;
+
   return (
     <li>
       <Link
@@ -223,8 +296,16 @@ function AppointmentCard({ appt, viewerRole, mode }) {
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-lg font-semibold text-[var(--color-neutral-900)]">
-              {counterparty}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-lg font-semibold text-[var(--color-neutral-900)]">
+                {counterparty}
+              </span>
+              {distance !== null && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-50)] px-2.5 py-0.5 text-sm font-semibold text-[var(--color-primary-700)]">
+                  <MapPin size={12} strokeWidth={2.5} aria-hidden="true" />
+                  {fmtDistance(distance)}
+                </span>
+              )}
             </div>
             <div className="mt-2 flex flex-col gap-1.5 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
               <span className="inline-flex items-center gap-1.5">
@@ -254,6 +335,13 @@ function AppointmentCard({ appt, viewerRole, mode }) {
       </Link>
     </li>
   );
+}
+
+function fmtDistance(miles) {
+  if (miles < 0.1) return 'Right here';
+  if (miles < 1) return `${(miles * 10 | 0) / 10} mi`;
+  if (miles < 10) return `${miles.toFixed(1)} mi`;
+  return `${Math.round(miles)} mi`;
 }
 
 function EmptyCard({ title, body, cta }) {

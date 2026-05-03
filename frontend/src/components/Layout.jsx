@@ -19,6 +19,7 @@ import {
   LogOut,
   Menu,
   X,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 
@@ -34,6 +35,9 @@ export default function Layout() {
     },
     { label: 'Appointments', to: '/appointments', icon: CalendarDays },
     { label: 'Messages', to: '/messages', icon: MessageCircle },
+    user?.role === 'admin' && {
+      label: 'Revenue', to: '/admin/revenue', icon: DollarSign,
+    },
     { label: 'Profile', to: '/profile', icon: UserIcon },
   ].filter(Boolean);
 
