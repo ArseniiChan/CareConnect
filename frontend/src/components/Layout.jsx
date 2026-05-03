@@ -21,6 +21,7 @@ import {
   X,
   DollarSign,
 } from 'lucide-react';
+import { LogoMark } from './Logo';
 import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {
@@ -55,10 +56,14 @@ export default function Layout() {
     <div className="min-h-screen bg-[var(--color-neutral-50)]">
       <a href="#main" className="skip-link">Skip to main content</a>
 
-      {/* ── Desktop Header ────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 hidden border-b border-[var(--color-border)] bg-white/95 backdrop-blur nav-break:block">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6">
-          <Link to="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
+      {/* ── Desktop / tablet header ─────────────────────────────── */}
+      <header className="sticky top-0 z-50 hidden border-b border-[var(--color-border)] bg-white/95 backdrop-blur md:block">
+        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-6">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]"
+            aria-label="CareConnect home"
+          >
             <span className="inline-block h-8 w-8 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
             CareConnect
           </Link>
@@ -101,8 +106,12 @@ export default function Layout() {
       {/* ── Mobile Header + Dropdown ──────────────────────────── */}
       <header className="sticky top-0 z-50 relative border-b border-[var(--color-border)] bg-white/95 backdrop-blur nav-break:hidden">
         <div className="flex h-16 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-[var(--color-neutral-900)]">
-            <span className="h-7 w-7 rounded-full bg-[var(--color-primary-600)]" />
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-xl font-bold tracking-tight text-[var(--color-neutral-900)]"
+            aria-label="CareConnect home"
+          >
+            <span className="inline-block h-7 w-7 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
             CareConnect
           </Link>
 

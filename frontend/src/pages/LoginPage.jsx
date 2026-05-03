@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { LogoLockup } from '../components/Logo';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -42,11 +43,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         {/* Brand mark — orientation for users who land on this page directly. */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <span className="inline-block h-10 w-10 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
-          <span className="text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
-            CareConnect
-          </span>
+        <div className="mb-8 flex items-center justify-center">
+          <LogoLockup size={36} />
         </div>
 
         <form onSubmit={handleSubmit} className="card">
@@ -54,7 +52,7 @@ export default function LoginPage() {
             Welcome back
           </h1>
           <p className="mb-6 text-base text-[var(--color-neutral-600)]">
-            Sign in to your CareConnect account.
+            Sign in to continue.
           </p>
 
           <div className="mb-4">
