@@ -24,6 +24,16 @@
   background: var(--cc-surface);
 }
 
+/* Responsive collapse: single column under 880px */
+@media (max-width: 880px) {
+  .cc-app {
+    grid-template-columns: 1fr;
+  }
+  .cc-sidebar {
+    display: none;
+  }
+}
+
 .cc-theme-paper.cc-app {
   --cc-surface: #faf7f2;
   --cc-surface-2: #fffdf8;
@@ -105,10 +115,10 @@
   color: inherit;
   text-align: left;
   padding: 0.55rem 0.75rem;
-  border-radius: 10px;
-  font-size: 0.92rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 140ms cubic-bezier(.2,.9,.2,1), color 120ms ease;
 }
 
 .cc-nav button:hover {
@@ -201,6 +211,12 @@
   border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius);
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
+  transition: transform 180ms cubic-bezier(.2,.9,.2,1), box-shadow 160ms ease;
+}
+
+.cc-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.09);
 }
 
 .cc-theme-nocturne .cc-card {
