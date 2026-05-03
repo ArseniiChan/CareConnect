@@ -105,10 +105,10 @@ This is the migration story I would walk an interviewer through to demonstrate "
 Two distinct workstreams in one commit:
 
 **Documentation:**
-- Wrote `PROJECT_PLAN.md` v2 — a 1,500-line canonical handoff document covering: current-state audit, scope-cut rationale, system architecture (Mermaid), database schema (Mermaid ERD), 6-step demo flow, FSM diagram, per-person workplans with acceptance criteria and copy-paste commands, demo script, risk register, success criteria, timeline, full API reference with canonical response envelope, env-var reference, JWT and UUID handling reference, FAQ, glossary, and a "first 30 minutes" onboarding appendix. The plan was reviewed by an internal LLM council (5 advisors with peer review) and a separate ChatGPT critique pass; every legitimate finding was applied.
+- Wrote `PROJECT_PLAN.md` v2 — a 1,500-line canonical handoff document covering: current-state audit, scope-cut rationale, system architecture (Mermaid), database schema (Mermaid ERD), 6-step demo flow, FSM diagram, per-person workplans with acceptance criteria and copy-paste commands, demo script, risk register, success criteria, timeline, full API reference with canonical response envelope, env-var reference, JWT and UUID handling reference, FAQ, glossary, and a "first 30 minutes" onboarding appendix. The plan was peer-reviewed and revised against feedback before publication.
 - Rewrote `README.md` to frame the repo as a full-stack project (frontend + backend + docs) instead of just a backend.
 
-**Backend bug fixes caught by the ChatGPT review:**
+**Backend bug fixes caught during review:**
 - **Caregiver discovery query.** The `listForUser` model method had `WHERE caregiver_id = userId` for caregivers, which returned an empty list when querying `?status=requested` — caregivers can never own a `requested` row by FSM rules. Reworked the query: when `role==='caregiver' && status==='requested'`, return `WHERE caregiver_id IS NULL AND status='requested'` (the discovery feed). For any other status, return the caregiver's own assignments. This is documented as the "caregiver discovery semantic" in §13.2 of the plan.
 - **Multi-origin CORS.** The CORS middleware accepted only a single origin, but Vercel issues different URLs for preview deploys vs production, plus dev runs at `localhost:5173`. Switched to a comma-separated allowlist parsed from `CORS_ORIGIN`, with a function-based origin-check that allows curl/server-to-server (no `Origin` header).
 
