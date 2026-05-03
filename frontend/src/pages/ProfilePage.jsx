@@ -551,7 +551,7 @@ function appointmentTitle(a, role) {
   if (a.caregiver_first_name && a.caregiver_last_name) {
     return `${a.caregiver_first_name} ${a.caregiver_last_name}`;
   }
-  return 'Awaiting caregiver';
+  return 'Looking for a caregiver';
 }
 
 function fmtDateTime(startIso, endIso) {

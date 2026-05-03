@@ -115,10 +115,10 @@ export default function BookPage() {
     <div className="mx-auto max-w-2xl">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-[var(--color-neutral-900)]">
-          Book Care
+          Book a visit
         </h1>
         <p className="mt-2 text-lg text-[var(--color-neutral-600)]">
-          Tell us where, when, and what you need help with.
+          A verified caregiver, at your home, on your schedule.
         </p>
       </header>
 

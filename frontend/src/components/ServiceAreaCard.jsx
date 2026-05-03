@@ -133,10 +133,10 @@ export default function ServiceAreaCard({ area, onChange }) {
         </span>
         <div>
           <h2 className="text-lg font-bold text-[var(--color-neutral-900)]">
-            Set your service area
+            Your service area
           </h2>
           <p className="mt-0.5 text-base text-[var(--color-neutral-600)]">
-            We will only show open requests near you.
+            Only open requests near you appear below.
           </p>
         </div>
       </div>

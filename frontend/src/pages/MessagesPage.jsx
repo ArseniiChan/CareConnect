@@ -4,10 +4,11 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { appointments } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import Avatar from '../components/Avatar';
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ export default function MessagesPage() {
             No conversations yet
           </p>
           <p className="mt-2 text-base text-[var(--color-neutral-600)]">
-            Once an appointment is scheduled, you can chat about it here.
+            Chats appear here once a caregiver accepts your visit.
           </p>
         </div>
       )}
@@ -64,14 +65,25 @@ export default function MessagesPage() {
               ? `${a.receiver_first_name || ''} ${a.receiver_last_name || ''}`.trim() || 'Care receiver'
               : (a.caregiver_first_name && a.caregiver_last_name)
                 ? `${a.caregiver_first_name} ${a.caregiver_last_name}`
-                : 'Awaiting caregiver';
+                : 'Looking for a caregiver';
+            const hasPerson = !counterparty.startsWith('Looking');
             return (
               <li key={a.appointment_id}>
                 <Link
                   to={`/appointments/${a.appointment_id}`}
-                  className="flex items-start justify-between gap-4 rounded-xl border border-[var(--color-border)] bg-white p-5 transition hover:border-[var(--color-primary-300)] hover:shadow-md"
+                  className="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-white p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--color-primary-300)] hover:shadow-[0_8px_24px_-8px_hsl(205,67%,45%,0.25)]"
                 >
-                  <div className="min-w-0">
+                  {hasPerson ? (
+                    <Avatar name={counterparty} size={44} />
+                  ) : (
+                    <span
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-border-strong)] text-[var(--color-neutral-400)]"
+                      aria-hidden="true"
+                    >
+                      <Search size={18} strokeWidth={2} />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
                     <div className="text-lg font-semibold text-[var(--color-neutral-900)]">
                       {counterparty}
                     </div>

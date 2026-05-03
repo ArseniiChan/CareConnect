@@ -18,6 +18,7 @@ import {
   LogOut,
   DollarSign,
 } from 'lucide-react';
+import { LogoMark } from './Logo';
 import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {
@@ -57,11 +58,11 @@ export default function Layout() {
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-6">
           <Link
             to="/"
-            className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]"
+            className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--color-neutral-900)] transition hover:opacity-80"
             aria-label="CareConnect home"
           >
-            <span className="inline-block h-8 w-8 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
-            CareConnect
+            <LogoMark size={32} className="text-[var(--color-primary-600)]" />
+            <span style={{ letterSpacing: '-0.025em' }}>CareConnect</span>
           </Link>
 
           <nav className="flex items-center gap-2" aria-label="Main">
@@ -116,8 +117,8 @@ export default function Layout() {
             className="flex items-center gap-2 text-xl font-bold tracking-tight text-[var(--color-neutral-900)]"
             aria-label="CareConnect home"
           >
-            <span className="inline-block h-7 w-7 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
-            CareConnect
+            <LogoMark size={28} className="text-[var(--color-primary-600)]" />
+            <span style={{ letterSpacing: '-0.025em' }}>CareConnect</span>
           </Link>
           <button
             type="button"
