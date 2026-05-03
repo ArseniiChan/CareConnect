@@ -168,10 +168,14 @@ CREATE TABLE appointment (
 
 
 -- ── message (per-appointment chat) ──────────────────────────
+-- sender_role is denormalized from users.role on insert. It saves a JOIN
+-- on every message render, which matters because the chat polls every
+-- 3 seconds.
 CREATE TABLE message (
   message_id      BINARY(16) NOT NULL DEFAULT (uuid_to_bin(uuid())),
   appointment_id  BINARY(16) NOT NULL,
   sender_id       BINARY(16) NOT NULL,
+  sender_role     ENUM('caregiver','care_receiver') NOT NULL,
   message_text    TEXT       NOT NULL,
   sent_at         TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
   read_at         DATETIME,

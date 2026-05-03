@@ -21,6 +21,7 @@ import {
   X,
   DollarSign,
 } from 'lucide-react';
+import { LogoMark } from './Logo';
 import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {

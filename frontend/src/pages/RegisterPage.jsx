@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Heart, HandHelping, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { LogoLockup } from '../components/Logo';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -60,11 +61,8 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <span className="inline-block h-10 w-10 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
-          <span className="text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
-            CareConnect
-          </span>
+        <div className="mb-8 flex items-center justify-center">
+          <LogoLockup size={36} />
         </div>
 
         <div className="card">

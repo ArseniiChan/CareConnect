@@ -20,6 +20,7 @@ import { appointments } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
 import ServiceAreaCard, { loadServiceArea } from '../components/ServiceAreaCard';
 import AppointmentsMap from '../components/AppointmentsMap';
+import Avatar from '../components/Avatar';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -55,15 +56,15 @@ function CareReceiverHome() {
       <div className="mb-8 flex flex-col items-start gap-3 rounded-xl border border-[var(--color-primary-100)] bg-gradient-to-br from-[var(--color-primary-50)] to-white p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[var(--color-neutral-900)]">
-            Need care soon?
+            Need care today?
           </h2>
           <p className="mt-1 text-base text-[var(--color-neutral-600)]">
-            Book a verified caregiver in under a minute.
+            Pick a time, share your address, done.
           </p>
         </div>
         <Link to="/book" className="btn btn-primary btn-lg shrink-0">
           <CalendarPlus size={20} strokeWidth={2.2} aria-hidden="true" />
-          Book Care
+          Book a visit
         </Link>
       </div>
 
@@ -72,9 +73,9 @@ function CareReceiverHome() {
         {items === null && <Skeleton rows={2} />}
         {items && upcoming.length === 0 && (
           <EmptyCard
-            title="No upcoming appointments"
-            body="Book your first care session — it only takes a minute."
-            cta={<Link to="/book" className="btn btn-primary">Book Care</Link>}
+            title="No upcoming visits"
+            body="Book your first one — it takes under a minute."
+            cta={<Link to="/book" className="btn btn-primary">Book a visit</Link>}
           />
         )}
         {upcoming.length > 0 && (
@@ -281,22 +282,37 @@ function AppointmentCard({ appt, viewerRole, mode }) {
     ? `${appt.receiver_first_name || ''} ${appt.receiver_last_name || ''}`.trim() || 'Care receiver'
     : (appt.caregiver_first_name && appt.caregiver_last_name)
       ? `${appt.caregiver_first_name} ${appt.caregiver_last_name}`
-      : 'Awaiting caregiver';
+      : 'Looking for a caregiver';
+
+  // No-name fallback (open requests waiting for assignment): we still want
+  // a visual placeholder, but a colored circle with someone's initials
+  // would lie. Use a neutral disc so the card composition stays consistent.
+  const hasPerson = !counterparty.startsWith('Looking');
 
   // distance_miles is only set when the caller passed lat/lng. Show it
-  // prominently on caregiver discovery cards — it's the most relevant fact
-  // when deciding which open request to take.
+  // prominently on caregiver discovery cards — most relevant fact when
+  // choosing which open request to take.
   const distance = typeof appt.distance_miles === 'number' ? appt.distance_miles : null;
 
   return (
     <li>
       <Link
         to={`/appointments/${appt.appointment_id}`}
-        className="block rounded-xl border border-[var(--color-border)] bg-white p-5 transition hover:border-[var(--color-primary-300)] hover:shadow-md"
+        className="group block rounded-xl border border-[var(--color-border)] bg-white p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--color-primary-300)] hover:shadow-[0_8px_24px_-8px_hsl(205,67%,45%,0.25)]"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-start gap-4">
+          {hasPerson ? (
+            <Avatar name={counterparty} size={48} />
+          ) : (
+            <span
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-border-strong)] text-[var(--color-neutral-400)]"
+              aria-hidden="true"
+            >
+              <Search size={20} strokeWidth={2} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-lg font-semibold text-[var(--color-neutral-900)]">
                 {counterparty}
               </span>
@@ -307,7 +323,7 @@ function AppointmentCard({ appt, viewerRole, mode }) {
                 </span>
               )}
             </div>
-            <div className="mt-2 flex flex-col gap-1.5 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
+            <div className="mt-1.5 flex flex-col gap-1 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
               <span className="inline-flex items-center gap-1.5">
                 <Clock size={16} strokeWidth={2} aria-hidden="true" />
                 {fmtDateTime(appt.start_time, appt.end_time)}
@@ -328,8 +344,9 @@ function AppointmentCard({ appt, viewerRole, mode }) {
           <StatusBadge status={appt.status} />
         </div>
         {mode === 'discover' && (
-          <p className="mt-4 text-base font-semibold text-[var(--color-primary-700)]">
-            View details and accept →
+          <p className="mt-4 inline-flex items-center gap-1 text-base font-semibold text-[var(--color-primary-700)] transition group-hover:gap-2">
+            View details and accept
+            <span aria-hidden="true">→</span>
           </p>
         )}
       </Link>

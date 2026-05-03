@@ -1,5 +1,9 @@
 // StatusBadge — appointment.status indicator.
 //
+// Labels rewritten for elderly clarity. "Requested" used to mean nothing
+// to a 78-year-old — they'd ask their daughter "did it work? Is somebody
+// coming?" The new labels answer that question on the badge itself.
+//
 // Color choices (per index.css palette):
 //   requested  → primary blue   (calm, neutral, "waiting")
 //   scheduled  → teal/success   (healing color — kinder than bright green)
@@ -14,21 +18,21 @@ import { CircleDot, CalendarCheck, CheckCircle2, XCircle } from 'lucide-react';
 
 const STYLES = {
   requested: {
-    label: 'Requested',
+    label: 'Looking for caregiver',
     Icon: CircleDot,
     bg: 'bg-[hsl(205,79%,95%)]',
     text: 'text-[hsl(205,87%,27%)]',
     ring: 'ring-[hsl(205,80%,88%)]',
   },
   scheduled: {
-    label: 'Scheduled',
+    label: 'Caregiver confirmed',
     Icon: CalendarCheck,
     bg: 'bg-[hsl(165,67%,95%)]',
     text: 'text-[hsl(176,67%,26%)]',
     ring: 'ring-[hsl(165,70%,87%)]',
   },
   completed: {
-    label: 'Completed',
+    label: 'Visit complete',
     Icon: CheckCircle2,
     bg: 'bg-[hsl(212,33%,92%)]',
     text: 'text-[hsl(209,34%,30%)]',

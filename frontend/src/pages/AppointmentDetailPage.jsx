@@ -17,6 +17,7 @@ import { ChevronLeft, Send, MapPin, Clock, MessageCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { appointments, messages as messagesApi } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import Avatar from '../components/Avatar';
 
 const POLL_MS = 3000;
 
@@ -143,7 +144,8 @@ export default function AppointmentDetailPage() {
     ? `${appt.receiver_first_name || ''} ${appt.receiver_last_name || ''}`.trim() || 'Care receiver'
     : (appt.caregiver_first_name && appt.caregiver_last_name)
       ? `${appt.caregiver_first_name} ${appt.caregiver_last_name}`
-      : 'Awaiting caregiver';
+      : 'Looking for a caregiver';
+  const hasPerson = !counterparty.startsWith('Looking');
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -158,13 +160,25 @@ export default function AppointmentDetailPage() {
       {/* ── Detail card ───────────────────────────────────────── */}
       <div className="card mb-6">
         <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
-              {counterparty}
-            </h1>
-            <p className="mt-1 text-base text-[var(--color-neutral-500)]">
-              {isCaregiver ? 'Care receiver' : 'Caregiver'}
-            </p>
+          <div className="flex items-center gap-4">
+            {hasPerson ? (
+              <Avatar name={counterparty} size={56} />
+            ) : (
+              <span
+                className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-border-strong)] text-[var(--color-neutral-400)]"
+                aria-hidden="true"
+              >
+                <ChevronLeft size={22} strokeWidth={2} className="rotate-180" />
+              </span>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
+                {counterparty}
+              </h1>
+              <p className="mt-1 text-base text-[var(--color-neutral-500)]">
+                {isCaregiver ? 'Care receiver' : 'Caregiver'}
+              </p>
+            </div>
           </div>
           <StatusBadge status={appt.status} />
         </div>
@@ -191,6 +205,18 @@ export default function AppointmentDetailPage() {
         {appt.cancelled_reason && (
           <p className="alert alert-warning mt-5">
             <span><span className="font-semibold">Cancelled:</span> {appt.cancelled_reason}</span>
+          </p>
+        )}
+
+        {/* Reassurance — care receivers see "is someone coming?" anxiety
+            most acutely while a request is unassigned. Naming what's
+            happening helps. */}
+        {isReceiver && appt.status === 'requested' && !appt.cancelled_reason && (
+          <p className="alert alert-info mt-5">
+            <span>
+              <span className="font-semibold">We're notifying verified caregivers in your area.</span>{' '}
+              Most requests are accepted within a few hours. You'll see their name and details here as soon as someone confirms.
+            </span>
           </p>
         )}
 

@@ -4,10 +4,11 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { appointments } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import Avatar from '../components/Avatar';
 
 export default function AppointmentsPage() {
   const { user } = useAuth();
@@ -46,16 +47,16 @@ export default function AppointmentsPage() {
       {items && items.length === 0 && (
         <div className="rounded-xl border border-dashed border-[var(--color-border-strong)] bg-white p-10 text-center">
           <p className="text-lg font-semibold text-[var(--color-neutral-900)]">
-            No appointments yet
+            Nothing here yet
           </p>
           <p className="mt-2 text-base text-[var(--color-neutral-600)]">
             {user?.role === 'caregiver'
               ? 'Accept an open request from your home page to start.'
-              : 'Book your first care session — it only takes a minute.'}
+              : 'Book your first visit. It takes under a minute.'}
           </p>
           {user?.role === 'care_receiver' && (
             <Link to="/book" className="btn btn-primary mt-5 inline-flex">
-              Book Care
+              Book a visit
             </Link>
           )}
         </div>
@@ -63,44 +64,58 @@ export default function AppointmentsPage() {
 
       {items && items.length > 0 && (
         <ul className="space-y-3">
-          {items.map((a) => (
-            <li key={a.appointment_id}>
-              <Link
-                to={`/appointments/${a.appointment_id}`}
-                className="block rounded-xl border border-[var(--color-border)] bg-white p-5 transition hover:border-[var(--color-primary-300)] hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-lg font-semibold text-[var(--color-neutral-900)]">
-                      {user?.role === 'caregiver'
-                        ? `${a.receiver_first_name || ''} ${a.receiver_last_name || ''}`.trim() || 'Care receiver'
-                        : (a.caregiver_first_name && a.caregiver_last_name)
-                          ? `${a.caregiver_first_name} ${a.caregiver_last_name}`
-                          : 'Awaiting caregiver'}
-                    </div>
-                    <div className="mt-2 flex flex-col gap-1.5 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock size={16} strokeWidth={2} aria-hidden="true" />
-                        {fmtDateTime(a.start_time, a.end_time)}
+          {items.map((a) => {
+            const counterparty = user?.role === 'caregiver'
+              ? `${a.receiver_first_name || ''} ${a.receiver_last_name || ''}`.trim() || 'Care receiver'
+              : (a.caregiver_first_name && a.caregiver_last_name)
+                ? `${a.caregiver_first_name} ${a.caregiver_last_name}`
+                : 'Looking for a caregiver';
+            const hasPerson = !counterparty.startsWith('Looking');
+            return (
+              <li key={a.appointment_id}>
+                <Link
+                  to={`/appointments/${a.appointment_id}`}
+                  className="block rounded-xl border border-[var(--color-border)] bg-white p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--color-primary-300)] hover:shadow-[0_8px_24px_-8px_hsl(205,67%,45%,0.25)]"
+                >
+                  <div className="flex items-start gap-4">
+                    {hasPerson ? (
+                      <Avatar name={counterparty} size={48} />
+                    ) : (
+                      <span
+                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-border-strong)] text-[var(--color-neutral-400)]"
+                        aria-hidden="true"
+                      >
+                        <Search size={20} strokeWidth={2} />
                       </span>
-                      {a.address_line1 && (
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-lg font-semibold text-[var(--color-neutral-900)]">
+                        {counterparty}
+                      </div>
+                      <div className="mt-1.5 flex flex-col gap-1 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
                         <span className="inline-flex items-center gap-1.5">
-                          <MapPin size={16} strokeWidth={2} aria-hidden="true" />
-                          {a.address_line1}
+                          <Clock size={16} strokeWidth={2} aria-hidden="true" />
+                          {fmtDateTime(a.start_time, a.end_time)}
                         </span>
+                        {a.address_line1 && (
+                          <span className="inline-flex items-center gap-1.5">
+                            <MapPin size={16} strokeWidth={2} aria-hidden="true" />
+                            {a.address_line1}
+                          </span>
+                        )}
+                      </div>
+                      {a.notes && (
+                        <p className="mt-3 line-clamp-2 text-base text-[var(--color-neutral-700)]">
+                          {a.notes}
+                        </p>
                       )}
                     </div>
-                    {a.notes && (
-                      <p className="mt-3 line-clamp-2 text-base text-[var(--color-neutral-700)]">
-                        {a.notes}
-                      </p>
-                    )}
+                    <StatusBadge status={a.status} />
                   </div>
-                  <StatusBadge status={a.status} />
-                </div>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
