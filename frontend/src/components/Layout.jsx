@@ -57,20 +57,20 @@ export default function Layout() {
 
       {/* ── Desktop Header ────────────────────────────────────── */}
       <header className="sticky top-0 z-50 hidden border-b border-[var(--color-border)] bg-white/95 backdrop-blur nav-break:block">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6">
           <Link to="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--color-neutral-900)]">
             <span className="inline-block h-8 w-8 rounded-full bg-[var(--color-primary-600)]" aria-hidden="true" />
             CareConnect
           </Link>
 
-          <nav className="flex items-center gap-2" aria-label="Main">
+          <nav className="flex items-center gap-1" aria-label="Main">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `inline-flex h-12 items-center gap-2 rounded-[10px] px-4 text-base font-semibold transition ${
+                  `inline-flex h-10 items-center gap-2 rounded-[10px] px-3 text-sm font-semibold transition ${
                     isActive
                       ? 'bg-[var(--color-primary-50)] text-[var(--color-primary-800)]'
                       : 'text-[var(--color-neutral-700)] hover:bg-[var(--color-neutral-50)]'
@@ -90,7 +90,7 @@ export default function Layout() {
               </div>
               <div className="text-sm text-[var(--color-neutral-500)]">{roleLabel}</div>
             </div>
-            <button onClick={handleLogout} aria-label="Sign out" className="flex h-12 items-center justify-center rounded-[10px] border border-[var(--color-border-strong)] px-3 font-semibold text-[var(--color-neutral-700)] hover:bg-[var(--color-neutral-50)]">
+            <button onClick={handleLogout} aria-label="Sign out" className="flex h-10 items-center justify-center rounded-[10px] border border-[var(--color-border-strong)] px-3 font-semibold text-sm text-[var(--color-neutral-700)] hover:bg-[var(--color-neutral-50)]"> 
               <LogOut size={20} strokeWidth={2.2} />
               <span className="sr-only">Sign out</span>
             </button>
@@ -99,7 +99,7 @@ export default function Layout() {
       </header>
 
       {/* ── Mobile Header + Dropdown ──────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-white/95 backdrop-blur nav-break:hidden max-w-[500px]">
+      <header className="sticky top-0 z-50 relative border-b border-[var(--color-border)] bg-white/95 backdrop-blur nav-break:hidden">
         <div className="flex h-16 items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 text-xl font-bold text-[var(--color-neutral-900)]">
             <span className="h-7 w-7 rounded-full bg-[var(--color-primary-600)]" />
@@ -117,12 +117,13 @@ export default function Layout() {
         </div>
 
         {/* Sleek Mobile Dropdown Overlay */}
-        <div 
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isMobileMenuOpen ? 'max-h-[500px] border-b border-[var(--color-border)] opacity-100' : 'max-h-0 opacity-0'
-          } bg-white`}
+        <div
+          className={`absolute right-4 top-full z-50 overflow-hidden transition-all duration-200 ease-in-out ${
+            isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'pointer-events-none opacity-0'
+          }`}
+          style={{ width: 'min(500px, 100vw)' }}
         >
-          <nav className="flex flex-col p-2 space-y-1">
+          <nav className="flex flex-col p-2 space-y-1 bg-white/95 backdrop-blur border border-[var(--color-border)] rounded-b-lg shadow-sm">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
