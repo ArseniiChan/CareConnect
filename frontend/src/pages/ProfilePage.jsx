@@ -361,7 +361,7 @@ export default function ProfilePage() {
           </p>
 
           {role === 'caregiver' && me?.profile && (
-            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+            <dl className="mt-5 flex flex-wrap gap-4">
               <InfoItem icon={Phone} label="Phone" value={me.profile.phone || '—'} />
               <InfoItem
                 icon={Star}
@@ -382,7 +382,7 @@ export default function ProfilePage() {
           )}
 
           {role === 'care_receiver' && me?.profile && (
-            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+            <dl className="mt-5 flex flex-wrap gap-4">
               <InfoItem
                 label="Birthday"
                 value={me.profile.birthday ? fmtDateOnly(me.profile.birthday) : '—'}
@@ -512,12 +512,12 @@ export default function ProfilePage() {
 
 function InfoItem({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-neutral-50)] p-4">
+    <div className="w-fit max-w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-neutral-50)] p-4">
       <dt className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--color-neutral-500)]">
         {Icon && <Icon size={16} strokeWidth={2.2} aria-hidden="true" />}
         {label}
       </dt>
-      <dd className="mt-2 text-lg font-semibold text-[var(--color-neutral-900)]">{value}</dd>
+      <dd className="mt-2 w-fit max-w-full break-words text-lg font-semibold text-[var(--color-neutral-900)]">{value}</dd>
     </div>
   );
 }
