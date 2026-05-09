@@ -5,9 +5,13 @@ const CareReceiverModel = require('../models/careReceiver.model');
 const ApiError = require('../utils/ApiError');
 const { generate: generateUuid, toBin, whereUuid } = require('../utils/uuid');
 
-// Flat hourly rate for demo. In a production billing system this would come
-// from a service catalog or a per-caregiver rate column.
-const HOURLY_RATE_CENTS = 5000; // $50/hour
+// Platform take-rate, expressed in basis points (1 bp = 0.01%).
+// 2000 bp = 20% — the platform keeps 20% of each completed booking,
+// caregiver receives the remaining 80%. This is the only knob the
+// application owns; the per-caregiver hourly rate lives in caregiver.hourly_rate_cents
+// and is read inside sp_complete_appointment so payouts stay consistent
+// even if rates change between booking and completion.
+const PLATFORM_FEE_BPS = 2000;
 
 /**
  * Invoke a MySQL stored procedure with one OUT parameter and return its value.
@@ -157,14 +161,15 @@ const AppointmentService = {
   // ── COMPLETE (scheduled → completed) ────────────────
   // Delegated to sp_complete_appointment, which:
   //   1. Validates the caller is the assigned caregiver
-  //   2. Calculates pay from start/end time and the hourly rate
-  //   3. Updates the appointment row AND inserts a payment row in one TXN
-  // Two-statement atomic procedure — exactly the kind of work a stored
-  // procedure exists to do.
+  //   2. Reads the caregiver's hourly_rate_cents from their row
+  //   3. Calculates total = hours × rate, splits into platform fee + payout
+  //   4. Updates the appointment row AND inserts a payment row in one TXN
+  // Multi-statement atomic procedure with marketplace economics — exactly
+  // the kind of work a stored procedure exists to do.
   async complete(appointmentId, userId) {
     const result = await callProcedure(
       'sp_complete_appointment',
-      [userId, appointmentId, HOURLY_RATE_CENTS]
+      [userId, appointmentId, PLATFORM_FEE_BPS]
     );
 
     if (result === 'not_found') throw ApiError.notFound('Appointment not found');

@@ -34,6 +34,12 @@ const AppointmentModel = {
       .leftJoin('address as addr', function () {
         this.on(db.raw('a.address_id = addr.address_id'));
       })
+      .leftJoin('caregiver as cg', function () {
+        this.on(db.raw('a.caregiver_id = cg.caregiver_id'));
+      })
+      .leftJoin('careReceiver as cr', function () {
+        this.on(db.raw('a.care_receiver_id = cr.care_receiver_id'));
+      })
       .whereRaw(whereUuid('a.appointment_id'), [id])
       .select(
         db.raw(fromBin('a.appointment_id', 'appointment_id')),
@@ -43,7 +49,11 @@ const AppointmentModel = {
         'a.requested_at', 'a.start_time', 'a.end_time',
         'a.status', 'a.notes', 'a.cancelled_reason', 'a.cancelled_at', 'a.created_at',
         'addr.address_line1', 'addr.address_line2', 'addr.city', 'addr.state',
-        'addr.zip_code', 'addr.latitude', 'addr.longitude'
+        'addr.zip_code', 'addr.latitude', 'addr.longitude',
+        'cg.first_name as caregiver_first_name', 'cg.last_name as caregiver_last_name',
+        'cg.rating as caregiver_rating', 'cg.is_verified as caregiver_is_verified',
+        'cg.hourly_rate_cents as caregiver_hourly_rate_cents',
+        'cr.first_name as receiver_first_name', 'cr.last_name as receiver_last_name'
       )
       .first();
   },
@@ -151,6 +161,8 @@ const AppointmentModel = {
       'addr.address_line1', 'addr.address_line2', 'addr.city', 'addr.state',
       'addr.zip_code', 'addr.latitude', 'addr.longitude',
       'cg.first_name as caregiver_first_name', 'cg.last_name as caregiver_last_name',
+      'cg.rating as caregiver_rating', 'cg.is_verified as caregiver_is_verified',
+      'cg.hourly_rate_cents as caregiver_hourly_rate_cents',
       'cr.first_name as receiver_first_name', 'cr.last_name as receiver_last_name',
     ];
     if (hasOrigin) {

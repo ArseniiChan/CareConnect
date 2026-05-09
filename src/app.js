@@ -15,12 +15,18 @@ const { sanitizeObject } = require('./utils/sanitize');
 const app = express();
 
 // ── Proxy Trust ─────────────────────────────────────
-// Railway (and most PaaS) sit behind a reverse proxy that adds X-Forwarded-For.
-// Without this, express-rate-limit refuses to use that header (validation
-// error ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and req.ip is the proxy's IP, not
-// the real client. Trust ONE hop — the platform's edge proxy.
+// Railway sits behind multiple reverse-proxy hops (edge -> internal mesh ->
+// container). Without trust-proxy set, express-rate-limit refuses to use
+// X-Forwarded-For (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and req.ip is the
+// proxy's IP rather than the real client.
+//
+// First we tried `trust proxy: 1` and the warning kept firing — Railway has
+// at least two hops. Trusting the loopback + CGNAT ranges explicitly is
+// more precise than `true` (which would trust any X-Forwarded-For sender)
+// and matches Railway's actual network layout (100.64.0.0/10 is CGNAT,
+// used internally by Railway).
 if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
+  app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal', '100.64.0.0/10']);
 }
 
 // ── Security ────────────────────────────────────────

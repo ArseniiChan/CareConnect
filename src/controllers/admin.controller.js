@@ -25,11 +25,13 @@ const getDashboard = catchAsync(async (req, res) => {
       .where('status', 'paid')
       .select(
         db.raw('COUNT(*) as paid_count'),
-        db.raw('COALESCE(SUM(amount_cents), 0) as total_cents')
+        db.raw('COALESCE(SUM(amount_cents), 0) as gross_cents'),
+        db.raw('COALESCE(SUM(platform_fee_cents), 0) as platform_fee_cents'),
+        db.raw('COALESCE(SUM(caregiver_payout_cents), 0) as caregiver_payout_cents')
       )
       .first()
-      // payment table doesn't exist on every environment yet — be defensive
-      .catch(() => ({ paid_count: 0, total_cents: 0 })),
+      // payment table is missing on environments that haven't been migrated yet
+      .catch(() => ({ paid_count: 0, gross_cents: 0, platform_fee_cents: 0, caregiver_payout_cents: 0 })),
   ]);
 
   res.json({
@@ -39,7 +41,9 @@ const getDashboard = catchAsync(async (req, res) => {
       appointments,
       revenue: {
         paid_count: Number(revenue.paid_count) || 0,
-        total_cents: Number(revenue.total_cents) || 0,
+        gross_cents: Number(revenue.gross_cents) || 0,
+        platform_fee_cents: Number(revenue.platform_fee_cents) || 0,
+        caregiver_payout_cents: Number(revenue.caregiver_payout_cents) || 0,
       },
     },
   });
@@ -81,7 +85,9 @@ const getRevenueReport = catchAsync(async (req, res) => {
       .select(
         db.raw('DATE(p.created_at) as date'),
         db.raw('COUNT(*) as count'),
-        db.raw('SUM(p.amount_cents) as total_cents')
+        db.raw('SUM(p.amount_cents) as gross_cents'),
+        db.raw('SUM(p.platform_fee_cents) as platform_fee_cents'),
+        db.raw('SUM(p.caregiver_payout_cents) as caregiver_payout_cents')
       )
       .groupByRaw('DATE(p.created_at)')
       .orderBy('date'),
@@ -99,10 +105,12 @@ const getRevenueReport = catchAsync(async (req, res) => {
         'c.first_name',
         'c.last_name',
         db.raw('COUNT(*) as job_count'),
-        db.raw('SUM(p.amount_cents) as total_cents')
+        db.raw('SUM(p.amount_cents) as gross_cents'),
+        db.raw('SUM(p.caregiver_payout_cents) as payout_cents'),
+        db.raw('SUM(p.platform_fee_cents) as fee_cents')
       )
       .groupBy('c.caregiver_id', 'c.first_name', 'c.last_name')
-      .orderByRaw('SUM(p.amount_cents) DESC')
+      .orderByRaw('SUM(p.platform_fee_cents) DESC')
       .limit(10),
 
     db('payment')
@@ -110,7 +118,9 @@ const getRevenueReport = catchAsync(async (req, res) => {
       .where('created_at', '>=', db.raw('DATE_SUB(NOW(), INTERVAL ? DAY)', [days]))
       .select(
         db.raw('COUNT(*) as paid_count'),
-        db.raw('COALESCE(SUM(amount_cents), 0) as total_cents')
+        db.raw('COALESCE(SUM(amount_cents), 0) as gross_cents'),
+        db.raw('COALESCE(SUM(platform_fee_cents), 0) as platform_fee_cents'),
+        db.raw('COALESCE(SUM(caregiver_payout_cents), 0) as caregiver_payout_cents')
       )
       .first(),
   ]);
@@ -121,7 +131,12 @@ const getRevenueReport = catchAsync(async (req, res) => {
       period_days: days,
       totals: {
         paid_count: Number(totals.paid_count) || 0,
-        total_cents: Number(totals.total_cents) || 0,
+        // gross_cents = total flowed through the platform
+        // platform_fee_cents = what CareConnect kept (the actual revenue line)
+        // caregiver_payout_cents = what was paid out to caregivers
+        gross_cents: Number(totals.gross_cents) || 0,
+        platform_fee_cents: Number(totals.platform_fee_cents) || 0,
+        caregiver_payout_cents: Number(totals.caregiver_payout_cents) || 0,
       },
       by_day: byDay,
       by_caregiver: byCaregiver,
@@ -153,12 +168,18 @@ const exportRevenueCsv = catchAsync(async (req, res) => {
       'cr.first_name as receiver_first_name',
       'cr.last_name as receiver_last_name',
       'p.amount_cents',
+      'p.caregiver_payout_cents',
+      'p.platform_fee_cents',
       'p.currency'
     )
     .orderBy('p.created_at', 'desc');
 
-  const header = ['paid_at', 'appointment_start', 'appointment_end',
-    'caregiver', 'care_receiver', 'amount_usd', 'currency'];
+  const header = [
+    'paid_at', 'appointment_start', 'appointment_end',
+    'caregiver', 'care_receiver',
+    'gross_usd', 'caregiver_payout_usd', 'platform_fee_usd',
+    'currency',
+  ];
   const escape = (v) => {
     if (v === null || v === undefined) return '';
     const s = String(v);
@@ -173,6 +194,8 @@ const exportRevenueCsv = catchAsync(async (req, res) => {
       `${r.caregiver_first_name || ''} ${r.caregiver_last_name || ''}`.trim(),
       `${r.receiver_first_name || ''} ${r.receiver_last_name || ''}`.trim(),
       (r.amount_cents / 100).toFixed(2),
+      ((r.caregiver_payout_cents || 0) / 100).toFixed(2),
+      ((r.platform_fee_cents || 0) / 100).toFixed(2),
       r.currency,
     ].map(escape).join(','));
   }

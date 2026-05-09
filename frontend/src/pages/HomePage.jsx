@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CalendarPlus, Search, MapPin, Clock, List, Map as MapIcon } from 'lucide-react';
+import { CalendarPlus, Search, MapPin, Clock, List, Map as MapIcon, Star, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { appointments } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
@@ -323,6 +323,26 @@ function AppointmentCard({ appt, viewerRole, mode }) {
                 </span>
               )}
             </div>
+            {/* Caregiver trust signals — only shown when the viewer is a
+                care receiver looking at their own appointment (caregiver
+                is named, ratings exist). For caregiver-discovery view of
+                open requests, there's no caregiver yet so this hides. */}
+            {viewerRole === 'care_receiver' && hasPerson && (typeof appt.caregiver_rating === 'number' || appt.caregiver_is_verified) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-neutral-600)]">
+                {typeof appt.caregiver_rating === 'number' && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-neutral-800)]">
+                    <Star size={14} strokeWidth={2.2} fill="currentColor" className="text-[var(--color-warning-500)]" aria-hidden="true" />
+                    {Number(appt.caregiver_rating).toFixed(2)}
+                  </span>
+                )}
+                {appt.caregiver_is_verified ? (
+                  <span className="inline-flex items-center gap-1 text-[var(--color-success-700)]">
+                    <ShieldCheck size={14} strokeWidth={2.2} aria-hidden="true" />
+                    Verified
+                  </span>
+                ) : null}
+              </div>
+            )}
             <div className="mt-1.5 flex flex-col gap-1 text-base text-[var(--color-neutral-600)] sm:flex-row sm:items-center sm:gap-4">
               <span className="inline-flex items-center gap-1.5">
                 <Clock size={16} strokeWidth={2} aria-hidden="true" />

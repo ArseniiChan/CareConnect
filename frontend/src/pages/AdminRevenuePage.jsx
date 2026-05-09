@@ -97,17 +97,33 @@ export default function AdminRevenuePage() {
       </div>
 
       {/* ── Totals ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* Three numbers: gross is what flowed through us, platform fee is
+          what we kept (the actual revenue line), payouts is what
+          caregivers received. The fee is the headline number. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Stat
-          label="Total earned"
-          value={loading || !report ? '—' : usd(report.totals.total_cents)}
+          label="Platform revenue"
+          hint="What CareConnect kept (20% fee)"
+          value={loading || !report ? '—' : usd(report.totals.platform_fee_cents)}
           icon={DollarSign}
+          accent
         />
         <Stat
-          label="Paid bookings"
-          value={loading || !report ? '—' : report.totals.paid_count.toLocaleString()}
+          label="Gross billings"
+          hint="Total customers paid"
+          value={loading || !report ? '—' : usd(report.totals.gross_cents)}
+        />
+        <Stat
+          label="Caregiver payouts"
+          hint="What caregivers received"
+          value={loading || !report ? '—' : usd(report.totals.caregiver_payout_cents)}
         />
       </div>
+
+      <p className="mt-2 text-sm text-[var(--color-neutral-500)]">
+        {loading || !report ? ' ' :
+          `${report.totals.paid_count.toLocaleString()} paid booking${report.totals.paid_count === 1 ? '' : 's'} in the last ${report.period_days} days.`}
+      </p>
 
       {/* ── By day ───────────────────────────────────────── */}
       <Section title="Revenue by day">
@@ -116,12 +132,13 @@ export default function AdminRevenuePage() {
           <Empty body="No paid bookings in this window yet." />
         )}
         {!loading && report && report.by_day.length > 0 && (
-          <Table headers={['Date', 'Bookings', 'Revenue']}>
+          <Table headers={['Date', 'Bookings', 'Gross', 'Platform fee']}>
             {report.by_day.map((row) => (
               <tr key={row.date}>
                 <Td>{row.date}</Td>
                 <Td>{row.count}</Td>
-                <Td>{usd(row.total_cents)}</Td>
+                <Td>{usd(row.gross_cents)}</Td>
+                <Td className="font-semibold text-[var(--color-primary-700)]">{usd(row.platform_fee_cents)}</Td>
               </tr>
             ))}
           </Table>
@@ -129,18 +146,19 @@ export default function AdminRevenuePage() {
       </Section>
 
       {/* ── By caregiver ─────────────────────────────────── */}
-      <Section title="Top caregivers">
+      <Section title="Top caregivers by platform fee">
         {loading && <Skeleton />}
         {!loading && report && report.by_caregiver.length === 0 && (
           <Empty body="Caregivers will appear here once they complete paid bookings." />
         )}
         {!loading && report && report.by_caregiver.length > 0 && (
-          <Table headers={['Caregiver', 'Jobs', 'Revenue']}>
+          <Table headers={['Caregiver', 'Jobs', 'Payout', 'Platform fee']}>
             {report.by_caregiver.map((row, i) => (
               <tr key={i}>
                 <Td>{`${row.first_name} ${row.last_name}`}</Td>
                 <Td>{row.job_count}</Td>
-                <Td>{usd(row.total_cents)}</Td>
+                <Td>{usd(row.payout_cents)}</Td>
+                <Td className="font-semibold text-[var(--color-primary-700)]">{usd(row.fee_cents)}</Td>
               </tr>
             ))}
           </Table>
@@ -150,17 +168,18 @@ export default function AdminRevenuePage() {
   );
 }
 
-function Stat({ label, value, icon: Icon }) {
+function Stat({ label, hint, value, icon: Icon, accent = false }) {
   return (
-    <div className="card flex items-center gap-4">
+    <div className={`card flex items-center gap-4 ${accent ? 'border-[var(--color-primary-200)] bg-gradient-to-br from-[var(--color-primary-50)] to-white' : ''}`}>
       {Icon && (
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-primary-50)] text-[var(--color-primary-700)]">
           <Icon size={22} strokeWidth={2.2} aria-hidden="true" />
         </span>
       )}
-      <div>
-        <p className="text-base text-[var(--color-neutral-600)]">{label}</p>
-        <p className="text-2xl font-bold text-[var(--color-neutral-900)]">{value}</p>
+      <div className="min-w-0">
+        <p className="text-base font-semibold text-[var(--color-neutral-700)]">{label}</p>
+        {hint && <p className="text-sm text-[var(--color-neutral-500)]">{hint}</p>}
+        <p className="mt-1 text-2xl font-bold text-[var(--color-neutral-900)]">{value}</p>
       </div>
     </div>
   );
@@ -194,9 +213,9 @@ function Table({ headers, children }) {
   );
 }
 
-function Td({ children }) {
+function Td({ children, className = '' }) {
   return (
-    <td className="border-t border-[var(--color-border)] px-4 py-3 text-base text-[var(--color-neutral-900)]">
+    <td className={`border-t border-[var(--color-border)] px-4 py-3 text-base text-[var(--color-neutral-900)] ${className}`}>
       {children}
     </td>
   );
