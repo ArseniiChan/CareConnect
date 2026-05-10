@@ -32,7 +32,7 @@ erDiagram
     }
 
     caregiver {
-        BINARY16 caregiver_id PK_FK "= users.user_id"
+        BINARY16 caregiver_id PK, FK "= users.user_id"
         VARCHAR first_name
         VARCHAR last_name
         VARCHAR email
@@ -44,7 +44,7 @@ erDiagram
     }
 
     careReceiver {
-        BINARY16 care_receiver_id PK_FK "= users.user_id"
+        BINARY16 care_receiver_id PK, FK "= users.user_id"
         VARCHAR first_name
         VARCHAR last_name
         DATE birthday
@@ -93,7 +93,7 @@ erDiagram
 
     payment {
         BINARY16 payment_id PK
-        BINARY16 appointment_id FK_UK
+        BINARY16 appointment_id FK, UK
         INT amount_cents
         CHAR3 currency "USD"
         VARCHAR status "paid|refunded"
