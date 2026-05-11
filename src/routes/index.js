@@ -21,5 +21,6 @@ router.use('/addresses', require('./address.routes'));
 router.use('/messages', require('./message.routes'));
 router.use('/admin', require('./admin.routes'));
 router.use('/geocode', require('./geocode.routes'));
+router.use('/chat', require('./chat.routes'));
 
 module.exports = router;

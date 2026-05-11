@@ -112,6 +112,15 @@ export const geocode = {
   lookup: (q) => api(`/api/v1/geocode?q=${encodeURIComponent(q)}`),
 };
 
+// ── Chat (Gemini-backed assistant) ───────────────────────────
+export const chat = {
+  send: (messages) =>
+    api('/api/v1/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
+};
+
 // ── Admin ─────────────────────────────────────────────────────
 export const admin = {
   dashboard: () => api('/api/v1/admin/dashboard'),

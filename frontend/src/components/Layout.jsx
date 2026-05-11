@@ -22,6 +22,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { LogoMark } from './Logo';
+import ChatWidget from './ChatWidget';
 import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {
@@ -171,6 +172,8 @@ export default function Layout() {
       <main id="main" className="mx-auto max-w-6xl px-4 py-6 nav-break:px-6 nav-break:py-10">
         <Outlet />
       </main>
+
+      <ChatWidget />
     </div>
   );
 }
