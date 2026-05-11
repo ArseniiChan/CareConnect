@@ -1,13 +1,19 @@
 // Canonical API client for CareConnect.
 // See PROJECT_PLAN.md §13.0 for the response envelope contract.
-
-const BASE = import.meta.env.VITE_API_URL;
+//
+// Two env var names are supported, in priority order:
+//   1. VITE_API_BASE_URL — preferred (Docker / Railway convention)
+//   2. VITE_API_URL      — legacy (existing Vercel deploy)
+// Either will work; we prefer the new name so production migrations don't
+// require touching the codebase.
+const BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
 
 if (!BASE) {
   // Surfacing this loud rather than failing on every fetch with a confusing error.
   console.error(
-    'VITE_API_URL is not set. Create frontend/.env with:\n' +
-    'VITE_API_URL=https://careconnect-backend-production-65cc.up.railway.app'
+    'API base URL is not set. Set one of:\n' +
+    '  VITE_API_BASE_URL=https://<your-backend-host>\n' +
+    '  VITE_API_URL=https://<your-backend-host>'
   );
 }
 

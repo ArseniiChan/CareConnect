@@ -34,18 +34,27 @@ app.use(helmet());                // Security headers
 app.use(hpp());                   // Prevent HTTP parameter pollution
 
 // ── CORS ────────────────────────────────────────────
-// Supports multiple origins via comma-separated CORS_ORIGIN env var.
-// Vercel issues a different URL for preview deploys vs production, plus
-// developers run the frontend at localhost:5173 — so a single origin won't
-// work. Parse a list and check incoming requests against it.
+// Supports multiple origins via a comma-separated allowlist. Two env var
+// names are accepted, in priority order:
+//   1. FRONTEND_URL — preferred (Docker / Railway / spec convention)
+//   2. CORS_ORIGIN  — legacy (existing Railway env var)
+// Either may be a single URL or a comma-separated list. We merge both so
+// the migration from CORS_ORIGIN to FRONTEND_URL doesn't break running
+// environments that still have CORS_ORIGIN configured.
 //
 // Examples:
-//   CORS_ORIGIN=http://localhost:5173
-//   CORS_ORIGIN=https://careconnect.vercel.app,https://careconnect-git-main-arsenii.vercel.app,http://localhost:5173
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
-  .split(',')
+//   FRONTEND_URL=https://care-connect-omega-jade.vercel.app
+//   CORS_ORIGIN=https://prod.example.com,http://localhost:8080
+const ORIGIN_DEFAULT = 'http://localhost:5173';
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+]
+  .filter(Boolean)
+  .flatMap((v) => v.split(','))
   .map((s) => s.trim())
   .filter(Boolean);
+if (allowedOrigins.length === 0) allowedOrigins.push(ORIGIN_DEFAULT);
 
 app.use(cors({
   origin: (origin, cb) => {

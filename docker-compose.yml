@@ -1,0 +1,50 @@
+# Local dev/test composition. Brings up the backend and the frontend in
+# Docker containers and points the frontend at the backend.
+#
+# Not used by Railway — Railway reads each service's individual Dockerfile.
+# This file exists so the team can verify the production build locally
+# before pushing.
+#
+# Usage:
+#   docker compose up --build
+#
+# Then:
+#   frontend → http://localhost:8080
+#   backend  → http://localhost:3000  (health: /health, docs: /api/docs)
+#
+# Database is hosted externally (Aiven MySQL). The backend reads DB_HOST,
+# DB_PORT, DB_USER, DB_PASSWORD, DB_NAME from your local .env file at the
+# repo root. There is intentionally no DB service in this compose file.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careconnect-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # FRONTEND_URL matches the port the frontend service is mapped to
+      # below. The backend reads this to whitelist CORS + Socket.IO origins.
+      FRONTEND_URL: http://localhost:8080
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Vite inlines this at build time. For local docker-compose, the
+        # backend service is reachable on the host's localhost:3000.
+        VITE_API_BASE_URL: http://localhost:3000
+    container_name: careconnect-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

@@ -23,6 +23,14 @@ Thumbs.db
 .vscode
 .idea
 *.swp
+structure.txt
+
+# Docker (don't recurse into the compose / Dockerfiles themselves; the
+# build context only needs source + deps + .env.example)
+docker-compose.yml
+frontend/Dockerfile
+frontend/nginx.conf
+frontend/.dockerignore
 
 # Git
 .git
